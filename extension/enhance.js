@@ -278,23 +278,20 @@ function syncMasterToggles() {
   const customKeys = ['notify-online','prevent-jump','dark-scrollbar','larger-emoji'];
   const extraKeys = ['btn-like','btn-mark-read','btn-top','btn-mute'];
 
-  document.getElementById('enh-private-master').checked = privateKeys.some(k => activeFeatures.has(k));
-  document.getElementById('enh-custom-master').checked = customKeys.some(k => activeFeatures.has(k));
-  document.getElementById('enh-extra-master').checked = extraKeys.some(k => activeFeatures.has(k));
-}
+  const privateMaster = document.getElementById('enh-private-master');
+  const customMaster = document.getElementById('enh-custom-master');
+  const extraMaster = document.getElementById('enh-extra-master');
 
-// --------------- Wire up Enhancement checkboxes ---------------
-document.querySelectorAll('[data-enh]').forEach(cb => {
-  cb.addEventListener('change', () => {
-    applyFeature(cb.dataset.enh, cb.checked);
-    saveEnhSettings();
-    syncMasterToggles();
-  });
-});
+  if (privateMaster) privateMaster.checked = privateKeys.some(k => activeFeatures.has(k));
+  if (customMaster) customMaster.checked = customKeys.some(k => activeFeatures.has(k));
+  if (extraMaster) extraMaster.checked = extraKeys.some(k => activeFeatures.has(k));
+}
 
 // Master toggles — enable/disable all in section
 function bindMasterToggle(masterId, keys) {
-  document.getElementById(masterId).addEventListener('change', (e) => {
+  const masterEl = document.getElementById(masterId);
+  if (!masterEl) return;
+  masterEl.addEventListener('change', (e) => {
     const enabled = e.target.checked;
     keys.forEach(key => {
       const cb = document.querySelector(`[data-enh="${key}"]`);
@@ -305,9 +302,29 @@ function bindMasterToggle(masterId, keys) {
   });
 }
 
-bindMasterToggle('enh-private-master', ['blur-names','blur-avatars','blur-previews','blur-messages','blur-composer','hide-typing','hide-recording','hide-read-receipts','hide-online']);
-bindMasterToggle('enh-custom-master', ['notify-online','prevent-jump','dark-scrollbar','larger-emoji']);
-bindMasterToggle('enh-extra-master', ['btn-like','btn-mark-read','btn-top','btn-mute']);
+// Wrap initialization in a function and run it safely
+function initEnhancements() {
+  // --------------- Wire up Enhancement checkboxes ---------------
+  document.querySelectorAll('[data-enh]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      applyFeature(cb.dataset.enh, cb.checked);
+      saveEnhSettings();
+      syncMasterToggles();
+    });
+  });
 
-// Load saved settings on startup
-loadEnhSettings();
+  bindMasterToggle('enh-private-master', ['blur-names','blur-avatars','blur-previews','blur-messages','blur-composer','hide-typing','hide-recording','hide-read-receipts','hide-online']);
+  bindMasterToggle('enh-custom-master', ['notify-online','prevent-jump','dark-scrollbar','larger-emoji']);
+  bindMasterToggle('enh-extra-master', ['btn-like','btn-mark-read','btn-top','btn-mute']);
+
+  // Load saved settings on startup
+  loadEnhSettings();
+}
+
+// Run safely after content.js has initialized the DOM
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initEnhancements);
+} else {
+  // Give it a tiny delay to ensure content.js has finished generating the sidebarHTML
+  setTimeout(initEnhancements, 100);
+}
