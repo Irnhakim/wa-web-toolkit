@@ -3,50 +3,37 @@ console.log('[WA Web Toolkit] Content script loaded (Baileys client mode).');
 
 let BACKEND_URL = 'http://localhost:3000';
 
-// Inject page-context script to read window.Store.Chat.getActive()
-const injectStoreListener = () => {
-  const script = document.createElement('script');
-  script.textContent = `
-    (function() {
-      let lastJid = null;
-      setInterval(() => {
-        try {
-          if (window.Store && window.Store.Chat && window.Store.Chat.getActive) {
-            const activeChat = window.Store.Chat.getActive();
-            if (activeChat) {
-              const jid = activeChat.id._serialized || activeChat.id;
-              if (jid !== lastJid) {
-                lastJid = jid;
-                window.postMessage({
-                  type: 'WAT_ACTIVE_CHAT',
-                  jid: jid,
-                  name: activeChat.name || activeChat.formattedTitle || 'Chat'
-                }, '*');
-              }
-            }
-          }
-        } catch (e) {}
-      }, 1000);
-    })();
-  `;
-  (document.head || document.documentElement).appendChild(script);
-  script.remove();
-};
-injectStoreListener();
-
-// Active chat detection state
+// Active chat detection state (populated by inject.js via postMessage)
 let activeChatJidOrName = null;
 let activeChatDisplayName = 'Chat';
 
-// Listen to messages from injected script
+// Listen for active chat broadcasts from inject.js (MAIN world)
 window.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'WAT_ACTIVE_CHAT') {
-    const { jid, name } = event.data;
-    activeChatJidOrName = jid;
-    activeChatDisplayName = name;
-    updateActiveChatInfo();
+  if (event.source === window && event.data && event.data.type === 'WAT_ACTIVE_CHAT') {
+    activeChatJidOrName = event.data.jid;
+    activeChatDisplayName = event.data.name || 'Chat';
+    refreshActiveChatIndicator();
   }
 });
+
+function refreshActiveChatIndicator() {
+  const indicator = document.getElementById('wat-active-chat-indicator');
+  const checkbox = document.getElementById('wat-use-active-chat');
+  if (!indicator || !checkbox || !checkbox.checked) return;
+  if (activeChatJidOrName) {
+    const isGroup = activeChatJidOrName.includes('@g.us');
+    const label = isGroup ? `${activeChatDisplayName} (Grup)` : `${activeChatDisplayName}`;
+    indicator.innerText = `✅ ${label}`;
+    indicator.style.color = '#00e676';
+    indicator.style.borderColor = 'rgba(0, 230, 118, 0.2)';
+    indicator.style.background = 'rgba(0, 230, 118, 0.05)';
+  } else {
+    indicator.innerText = 'Buka salah satu chat terlebih dahulu ⚠️';
+    indicator.style.color = '#ff9800';
+    indicator.style.borderColor = 'rgba(255, 152, 0, 0.2)';
+    indicator.style.background = 'rgba(255, 152, 0, 0.05)';
+  }
+}
 
 // 1. Inject Stylesheet
 const linkEl = document.createElement('link');
@@ -57,9 +44,365 @@ document.head.appendChild(linkEl);
 // 2. Build UI Elements
 const sidebarHTML = `
   <div class="wat-header">
-    <h2>WA Web Toolkit (Baileys)</h2>
+    <h2>WA Web Toolkit</h2>
     <button class="wat-close-btn" id="wat-close-btn">&times;</button>
   </div>
+
+  <!-- TOP NAV: always visible, switches between Enhance and Bot views -->
+  <div style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.07); background: rgba(0,0,0,0.2);">
+    <button id="nav-enhance-btn" style="flex:1; padding: 9px 6px; font-size: 12px; font-weight: 700; color: #00b4db; background: rgba(0,180,219,0.1); border: none; cursor: pointer; border-bottom: 2px solid #00b4db; font-family: inherit;">✨ Enhance</button>
+    <button id="nav-bot-btn" style="flex:1; padding: 9px 6px; font-size: 12px; font-weight: 700; color: #8696a0; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; font-family: inherit;">⚡ Custom Send</button>
+  </div>
+
+  <!-- ENHANCE VIEW: always accessible, no login needed -->
+  <div id="wat-enhance-view" style="flex:1; overflow-y: auto; padding: 12px 15px;">
+
+    <!-- PRIVATE MODE -->
+    <div class="wat-enhance-section">
+      <div class="wat-enhance-section-header">
+        <span>🔒 Private Mode</span>
+        <label class="wat-toggle-switch">
+          <input type="checkbox" id="enh-private-master">
+          <span class="wat-toggle-slider"></span>
+        </label>
+      </div>
+      <p class="wat-enhance-desc">Sembunyikan info sensitif di layar</p>
+      <div class="wat-enhance-options">
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-names"> Blur nama kontak</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-avatars"> Blur foto kontak</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-previews"> Blur preview pesan terakhir</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-messages"> Blur isi pesan di chat</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-composer"> Blur kotak ketik pesan</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-typing"> Sembunyikan status mengetik</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-recording"> Sembunyikan status merekam</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-read-receipts"> Nonaktifkan centang biru</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-online"> Sembunyikan status Online saya</label>
+      </div>
+    </div>
+
+    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin: 10px 0;">
+
+    <!-- CUSTOMIZATIONS -->
+    <div class="wat-enhance-section">
+      <div class="wat-enhance-section-header">
+        <span>🎨 Customizations</span>
+        <label class="wat-toggle-switch">
+          <input type="checkbox" id="enh-custom-master">
+          <span class="wat-toggle-slider"></span>
+        </label>
+      </div>
+      <p class="wat-enhance-desc">Fungsi tambahan yang berguna</p>
+      <div class="wat-enhance-options">
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="notify-online"> Notif saat kontak online</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="prevent-jump"> Cegah daftar chat berpindah</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="dark-scrollbar"> Scrollbar gelap elegan</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="larger-emoji"> Emoji lebih besar di chat</label>
+      </div>
+    </div>
+
+    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin: 10px 0;">
+
+    <!-- EXTRA BUTTONS -->
+    <div class="wat-enhance-section">
+      <div class="wat-enhance-section-header">
+        <span>➕ Extra Buttons</span>
+        <label class="wat-toggle-switch">
+          <input type="checkbox" id="enh-extra-master">
+          <span class="wat-toggle-slider"></span>
+        </label>
+      </div>
+      <p class="wat-enhance-desc">Tambah tombol aksi di toolbar chat</p>
+      <div class="wat-enhance-options">
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-like"> Tombol Like ❤️</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-mark-read"> Tombol Tandai Dibaca ✅</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-top"> Tombol Scroll ke Atas ⬆️</label>
+        <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-mute"> Tombol Bisukan Chat 🔇</label>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOT VIEW: hidden by default, shown when Custom Send tab is clicked -->
+  <div id="wat-bot-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+
+    <!-- CONNECTION VIEW -->
+    <div id="wat-connection-view" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+      <div style="font-size: 14px; font-weight: 600; text-align: center; color: #00b4db; text-transform: uppercase; letter-spacing: 0.5px;">Koneksi Server Bot</div>
+      <div id="wat-connection-status-info" style="font-size: 13px; text-align: center; color: #ff5252; padding: 10px; background: rgba(255, 82, 82, 0.08); border-radius: 6px; border: 1px solid rgba(255, 82, 82, 0.15);">
+        Belum terhubung ke server backend ❌
+      </div>
+      
+      <div class="wat-form-group">
+        <label>URL Server Backend</label>
+        <input type="text" id="wat-backend-url-input" class="wat-input" placeholder="http://localhost:3000" value="http://localhost:3000">
+      </div>
+      <button id="wat-connect-server-btn" class="wat-btn wat-btn-primary">Hubungkan Server</button>
+
+      <!-- QR Code Render Container -->
+      <div id="wat-qr-container" style="display: none; margin-top: 15px; text-align: center; padding: 15px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+        <div style="font-size: 12px; color: #8696a0; margin-bottom: 12px; font-weight: 500; letter-spacing: 0.5px;">PINDAI QR UNTUK LOGIN WHATSAPP</div>
+        <div style="display: flex; justify-content: center;">
+          <div id="wat-qr-image-container" style="display: inline-block; background: white; padding: 10px; border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></div>
+        </div>
+        <div style="font-size: 11px; color: #00b4db; margin-top: 12px; font-weight: 600; line-height: 1.4;">
+          Buka WhatsApp -> Perangkat Tertaut -> Tautkan Perangkat
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TOOLKIT VIEW (Hidden until connected) -->
+    <div id="wat-main-view" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+      <div class="wat-tabs" style="display: flex; flex-wrap: wrap;">
+        <button class="wat-tab-btn active" data-tab="tab-buttons" style="flex: 1 1 30%;">Buttons</button>
+        <button class="wat-tab-btn" data-tab="tab-preview" style="flex: 1 1 30%;">Preview</button>
+        <button class="wat-tab-btn" data-tab="tab-carousel" style="flex: 1 1 30%;">Carousel</button>
+        <button class="wat-tab-btn" data-tab="tab-contact-loc" style="flex: 1 1 50%; font-size: 11px;">Contact/Loc</button>
+        <button class="wat-tab-btn" data-tab="tab-list" style="flex: 1 1 50%; font-size: 11px;">List Menu</button>
+      </div>
+
+      <div class="wat-body">
+        <!-- Status / Notification -->
+        <div class="wat-status" id="wat-status-box"></div>
+
+        <!-- Recipient Section -->
+        <div class="wat-form-group">
+          <label>Kirim Ke</label>
+          <div style="display: flex; gap: 15px; margin-bottom: 8px;">
+            <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #fff; cursor: pointer; font-weight: 500; margin-bottom: 0;">
+              <input type="radio" name="wat-target-type" value="contact" checked style="cursor: pointer; accent-color: #00b4db;"> Kontak
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #fff; cursor: pointer; font-weight: 500; margin-bottom: 0;">
+              <input type="radio" name="wat-target-type" value="group" style="cursor: pointer; accent-color: #00b4db;"> Grup WhatsApp
+            </label>
+          </div>
+
+          <!-- CONTACT PICKER FIELDS -->
+          <div id="wat-contact-picker-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <label style="margin-bottom: 0; font-size: 11px; color: #8696a0;">Nomor HP Tujuan</label>
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #00b4db; cursor: pointer; margin-bottom: 0; font-weight: 500;">
+                <input type="checkbox" id="wat-use-active-chat" checked style="cursor: pointer; accent-color: #00b4db;"> Chat Aktif
+              </label>
+            </div>
+            <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789" style="display: none;">
+            <div id="wat-active-chat-indicator" style="font-size: 13px; font-weight: 600; padding: 8px 10px; background: rgba(255, 152, 0, 0.05); border: 1px solid rgba(255, 152, 0, 0.2); border-radius: 6px; color: #ff9800; text-align: center;">
+              Buka salah satu chat terlebih dahulu ⚠️
+            </div>
+          </div>
+
+          <!-- GROUP PICKER FIELDS -->
+          <div id="wat-group-picker-container" style="display: none;">
+            <label style="font-size: 11px; color: #8696a0; margin-bottom: 5px; display: block;">Pilih Grup WhatsApp</label>
+            <select id="wat-group-select" class="wat-select" style="width: 100%;">
+              <option value="">Memuat daftar grup... ⏳</option>
+            </select>
+          </div>
+          
+          <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Mengirim otomatis ke chat yang sedang terbuka di WhatsApp Web.</div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 15px 0;" />
+
+        <!-- TAB 1: BUTTONS -->
+        <div id="tab-buttons" class="wat-tab-content active">
+          <div class="wat-form-group">
+            <label>Pesan Utama (Text)</label>
+            <textarea id="wat-btn-text" class="wat-textarea" placeholder="Tulis isi pesan Anda di sini..."></textarea>
+          </div>
+          <div class="wat-form-group">
+            <label>Judul Pesan (Title - Opsional)</label>
+            <input type="text" id="wat-btn-title" class="wat-input" placeholder="Header pesan">
+          </div>
+          <div class="wat-form-group">
+            <label>Kaki Pesan (Footer - Opsional)</label>
+            <input type="text" id="wat-btn-footer" class="wat-input" placeholder="Footer pesan">
+          </div>
+          
+          <div class="wat-form-group">
+            <label>Tambah Tombol (Maksimal 10)</label>
+            <div class="wat-button-list" id="wat-btn-list-container">
+              <!-- Dynamically added button list -->
+            </div>
+            <div style="display: flex; gap: 5px;">
+              <select id="wat-new-btn-type" class="wat-select" style="flex: 1;">
+                <option value="quick_reply">Quick Reply (Balas)</option>
+                <option value="url">Link URL</option>
+                <option value="phone">Panggilan Telepon</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 5px; margin-top: 5px;">
+              <input type="text" id="wat-new-btn-text" class="wat-input" placeholder="Teks Tombol" style="flex: 1;">
+              <input type="text" id="wat-new-btn-val" class="wat-input" placeholder="URL / No. Telp" style="flex: 1; display: none;">
+            </div>
+            <button type="button" id="wat-add-btn-trigger" class="wat-btn wat-btn-secondary" style="margin-top: 8px;">Tambah Tombol</button>
+          </div>
+
+          <button id="wat-send-buttons" class="wat-btn wat-btn-primary" style="margin-top: 10px;">Kirim Button Message</button>
+        </div>
+
+        <!-- TAB 2: LINK PREVIEW -->
+        <div id="tab-preview" class="wat-tab-content">
+          <div class="wat-form-group">
+            <label>Pesan Utama / Keterangan</label>
+            <textarea id="wat-lp-text" class="wat-textarea" placeholder="Tulis isi pesan pengantar..."></textarea>
+          </div>
+          <div class="wat-form-group">
+            <label>Tautan (URL)</label>
+            <input type="text" id="wat-lp-url" class="wat-input" placeholder="https://example.com">
+          </div>
+          <div class="wat-form-group">
+            <label>Judul Kustom (Custom Title)</label>
+            <input type="text" id="wat-lp-title" class="wat-input" placeholder="Judul Tautan Kustom">
+          </div>
+          <div class="wat-form-group">
+            <label>Deskripsi Kustom (Custom Description)</label>
+            <textarea id="wat-lp-desc" class="wat-textarea" placeholder="Deskripsi ringkas halaman..."></textarea>
+          </div>
+          <div class="wat-form-group">
+            <label>Nama Situs (Site Name - Opsional)</label>
+            <input type="text" id="wat-lp-sitename" class="wat-input" placeholder="Contoh: Tokopedia, YouTube, MyWebsite">
+          </div>
+          <div class="wat-form-group">
+            <label>Gambar Pratinjau (Thumbnail Base64 / URL)</label>
+            <input type="text" id="wat-lp-thumb" class="wat-input" placeholder="URL Gambar atau Base64 JPEG data">
+            <div style="margin-top: 5px; font-size: 11px; color: #8696a0;">Gunakan URL gambar publik atau konversi gambar ke data:image/jpeg;base64</div>
+          </div>
+          <button id="wat-send-preview" class="wat-btn wat-btn-primary" style="margin-top: 10px;">Kirim Link Preview</button>
+        </div>
+
+        <!-- TAB 3: CAROUSEL -->
+        <div id="tab-carousel" class="wat-tab-content">
+          <div class="wat-form-group">
+            <label>Kartu Karosel (Carousel Cards)</label>
+            <div id="wat-carousel-cards-container" class="wat-card-builder">
+              <!-- Dynamically added carousel cards -->
+            </div>
+            
+            <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.1);">
+              <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #00b4db;">Buat Kartu Baru</div>
+              <div class="wat-form-group">
+                <input type="text" id="wat-card-new-title" class="wat-input" placeholder="Judul Kartu">
+              </div>
+              <div class="wat-form-group">
+                <textarea id="wat-card-new-desc" class="wat-textarea" placeholder="Deskripsi Kartu"></textarea>
+              </div>
+              <div class="wat-form-group">
+                <input type="text" id="wat-card-new-url" class="wat-input" placeholder="Tautan URL Kartu">
+              </div>
+              <div class="wat-form-group">
+                <input type="text" id="wat-card-new-thumb" class="wat-input" placeholder="URL Gambar / Base64 Kartu">
+              </div>
+              
+              <div style="font-size: 11px; color: #8696a0; margin: 10px 0 3px 0; text-transform: uppercase;">Tombol Kartu 1 (Opsional)</div>
+              <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+                <select id="wat-card-btn1-type" class="wat-select" style="width: 30%;">
+                  <option value="quick_reply">Reply</option>
+                  <option value="url">URL</option>
+                </select>
+                <input type="text" id="wat-card-btn1-text" class="wat-input" placeholder="Teks" style="width: 35%;">
+                <input type="text" id="wat-card-btn1-val" class="wat-input" placeholder="URL" style="width: 35%;">
+              </div>
+
+              <div style="font-size: 11px; color: #8696a0; margin: 5px 0 3px 0; text-transform: uppercase;">Tombol Kartu 2 (Opsional)</div>
+              <div style="display: flex; gap: 4px; margin-bottom: 10px;">
+                <select id="wat-card-btn2-type" class="wat-select" style="width: 30%;">
+                  <option value="quick_reply">Reply</option>
+                  <option value="url">URL</option>
+                </select>
+                <input type="text" id="wat-card-btn2-text" class="wat-input" placeholder="Teks" style="width: 35%;">
+                <input type="text" id="wat-card-btn2-val" class="wat-input" placeholder="URL" style="width: 35%;">
+              </div>
+
+              <button type="button" id="wat-add-card-trigger" class="wat-btn wat-btn-secondary">Tambah Kartu</button>
+            </div>
+          </div>
+          
+          <button id="wat-send-carousel" class="wat-btn wat-btn-primary" style="margin-top: 10px;">Kirim Carousel Message</button>
+        </div>
+
+        <!-- TAB 4: CONTACT & LOCATION -->
+        <div id="tab-contact-loc" class="wat-tab-content">
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #00b4db; text-transform: uppercase;">Kirim Kartu Kontak (VCard)</div>
+          <div class="wat-form-group">
+            <label>Nama Kontak</label>
+            <input type="text" id="wat-con-name" class="wat-input" placeholder="Nama Lengkap Kontak">
+          </div>
+          <div class="wat-form-group">
+            <label>Organisasi / Perusahaan (Opsional)</label>
+            <input type="text" id="wat-con-org" class="wat-input" placeholder="Nama Perusahaan">
+          </div>
+          <div class="wat-form-group">
+            <label>Nomor Telepon Kontak</label>
+            <input type="text" id="wat-con-phone" class="wat-input" placeholder="Contoh: 628123456789">
+          </div>
+          <button id="wat-send-contact" class="wat-btn wat-btn-primary" style="margin-bottom: 25px;">Kirim Kartu Kontak</button>
+
+          <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 20px 0;" />
+
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #00b4db; text-transform: uppercase;">Kirim Lokasi Kustom</div>
+          <div class="wat-form-group">
+            <label>Nama Tempat / Lokasi</label>
+            <input type="text" id="wat-loc-name" class="wat-input" placeholder="Contoh: Mall Grand Indonesia">
+          </div>
+          <div class="wat-form-group">
+            <label>Alamat Detail</label>
+            <textarea id="wat-loc-address" class="wat-textarea" placeholder="Detail Alamat Lengkap..."></textarea>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <div class="wat-form-group" style="flex: 1;">
+              <label>Latitude</label>
+              <input type="text" id="wat-loc-lat" class="wat-input" placeholder="-6.200000">
+            </div>
+            <div class="wat-form-group" style="flex: 1;">
+              <label>Longitude</label>
+              <input type="text" id="wat-loc-lng" class="wat-input" placeholder="106.816666">
+            </div>
+          </div>
+          <button id="wat-send-location" class="wat-btn wat-btn-primary">Kirim Lokasi</button>
+        </div>
+
+        <!-- TAB 5: LIST MENU -->
+        <div id="tab-list" class="wat-tab-content">
+          <div class="wat-form-group">
+            <label>Judul List Menu (Title - Opsional)</label>
+            <input type="text" id="wat-list-title" class="wat-input" placeholder="Header Menu Utama">
+          </div>
+          <div class="wat-form-group">
+            <label>Pesan Utama (Text)</label>
+            <textarea id="wat-list-text" class="wat-textarea" placeholder="Silakan pilih opsi yang tersedia..."></textarea>
+          </div>
+          <div class="wat-form-group">
+            <label>Kaki List (Footer - Opsional)</label>
+            <input type="text" id="wat-list-footer" class="wat-input" placeholder="Footer teks kecil">
+          </div>
+          <div class="wat-form-group">
+            <label>Teks Tombol Pembuka Menu</label>
+            <input type="text" id="wat-list-btn-text" class="wat-input" placeholder="Klik Untuk Memilih Opsi">
+          </div>
+
+          <div class="wat-form-group">
+            <label>Opsi Pilihan (Maksimal 10)</label>
+            <div id="wat-list-options-container" class="wat-button-list" style="max-height: 150px; overflow-y: auto;">
+              <!-- Dynamically added list options -->
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: 8px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.1);">
+              <div class="wat-form-group" style="margin-bottom: 8px;">
+                <input type="text" id="wat-new-option-title" class="wat-input" placeholder="Judul Pilihan (Contoh: Bantuan)">
+              </div>
+              <div class="wat-form-group" style="margin-bottom: 8px;">
+                <input type="text" id="wat-new-option-desc" class="wat-input" placeholder="Deskripsi Singkat (Opsional)">
+              </div>
+              <button type="button" id="wat-add-option-trigger" class="wat-btn wat-btn-secondary">Tambah Opsi Baru</button>
+            </div>
+          </div>
+
+          <button id="wat-send-list" class="wat-btn wat-btn-primary" style="margin-top: 10px;">Kirim List Message</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+`;
   
   <!-- CONNECTION VIEW -->
   <div id="wat-connection-view" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
@@ -92,8 +435,9 @@ const sidebarHTML = `
       <button class="wat-tab-btn active" data-tab="tab-buttons" style="flex: 1 1 30%;">Buttons</button>
       <button class="wat-tab-btn" data-tab="tab-preview" style="flex: 1 1 30%;">Preview</button>
       <button class="wat-tab-btn" data-tab="tab-carousel" style="flex: 1 1 30%;">Carousel</button>
-      <button class="wat-tab-btn" data-tab="tab-contact-loc" style="flex: 1 1 45%; font-size: 11px;">Contact/Loc</button>
-      <button class="wat-tab-btn" data-tab="tab-list" style="flex: 1 1 45%; font-size: 11px;">List Menu</button>
+      <button class="wat-tab-btn" data-tab="tab-contact-loc" style="flex: 1 1 33%; font-size: 11px;">Contact/Loc</button>
+      <button class="wat-tab-btn" data-tab="tab-list" style="flex: 1 1 33%; font-size: 11px;">List Menu</button>
+      <button class="wat-tab-btn" data-tab="tab-enhance" style="flex: 1 1 33%; font-size: 11px;">✨ Enhance</button>
     </div>
 
     <div class="wat-body">
@@ -114,8 +458,16 @@ const sidebarHTML = `
 
         <!-- CONTACT PICKER FIELDS -->
         <div id="wat-contact-picker-container">
-          <label style="margin-bottom: 5px; font-size: 11px; color: #8696a0; display: block;">Nomor HP Tujuan</label>
-          <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0; font-size: 11px; color: #8696a0;">Nomor HP Tujuan</label>
+            <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #00b4db; cursor: pointer; margin-bottom: 0; font-weight: 500;">
+              <input type="checkbox" id="wat-use-active-chat" checked style="cursor: pointer; accent-color: #00b4db;"> Chat Aktif
+            </label>
+          </div>
+          <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789" style="display: none;">
+          <div id="wat-active-chat-indicator" style="font-size: 13px; font-weight: 600; padding: 8px 10px; background: rgba(255, 152, 0, 0.05); border: 1px solid rgba(255, 152, 0, 0.2); border-radius: 6px; color: #ff9800; text-align: center;">
+            Buka salah satu chat terlebih dahulu ⚠️
+          </div>
         </div>
 
         <!-- GROUP PICKER FIELDS -->
@@ -126,7 +478,7 @@ const sidebarHTML = `
           </select>
         </div>
         
-        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).</div>
+        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Mengirim otomatis ke chat yang sedang terbuka di WhatsApp Web.</div>
       </div>
 
       <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 15px 0;" />
@@ -327,6 +679,78 @@ const sidebarHTML = `
         <button id="wat-send-list" class="wat-btn wat-btn-primary" style="margin-top: 10px;">Kirim List Message</button>
       </div>
     </div>
+
+      <!-- TAB: ENHANCE -->
+      <div id="tab-enhance" class="wat-tab-content" style="padding: 0;">
+        <div style="padding: 12px 15px; overflow-y: auto; height: 100%;">
+
+          <!-- PRIVATE MODE -->
+          <div class="wat-enhance-section">
+            <div class="wat-enhance-section-header" id="enh-header-private">
+              <span>🔒 Private Mode</span>
+              <label class="wat-toggle-switch">
+                <input type="checkbox" id="enh-private-master">
+                <span class="wat-toggle-slider"></span>
+              </label>
+            </div>
+            <p class="wat-enhance-desc">Sembunyikan info sensitif di layar</p>
+            <div class="wat-enhance-options" id="enh-private-options">
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-names"> Blur nama kontak</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-avatars"> Blur foto kontak</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-previews"> Blur preview pesan terakhir</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-messages"> Blur isi pesan di chat</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="blur-composer"> Blur kotak ketik pesan</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-typing"> Sembunyikan status mengetik</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-recording"> Sembunyikan status merekam</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-read-receipts"> Nonaktifkan tanda baca (centang biru)</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="hide-online"> Sembunyikan status Online saya</label>
+            </div>
+          </div>
+
+          <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin: 10px 0;">
+
+          <!-- CUSTOMIZATIONS -->
+          <div class="wat-enhance-section">
+            <div class="wat-enhance-section-header">
+              <span>🎨 Customizations</span>
+              <label class="wat-toggle-switch">
+                <input type="checkbox" id="enh-custom-master">
+                <span class="wat-toggle-slider"></span>
+              </label>
+            </div>
+            <p class="wat-enhance-desc">Fungsi tambahan yang berguna</p>
+            <div class="wat-enhance-options" id="enh-custom-options">
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="notify-online"> Notif saat kontak online</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="prevent-jump"> Cegah daftar chat berpindah</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="dark-scrollbar"> Scrollbar gelap elegan</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="larger-emoji"> Emoji lebih besar di chat</label>
+            </div>
+          </div>
+
+          <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin: 10px 0;">
+
+          <!-- EXTRA BUTTONS -->
+          <div class="wat-enhance-section">
+            <div class="wat-enhance-section-header">
+              <span>➕ Extra Buttons</span>
+              <label class="wat-toggle-switch">
+                <input type="checkbox" id="enh-extra-master">
+                <span class="wat-toggle-slider"></span>
+              </label>
+            </div>
+            <p class="wat-enhance-desc">Tambah tombol aksi di toolbar chat</p>
+            <div class="wat-enhance-options" id="enh-extra-options">
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-like"> Tombol Like ❤️</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-mark-read"> Tombol Tandai Dibaca ✅</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-top"> Tombol Scroll ke Atas ⬆️</label>
+              <label class="wat-enh-opt"><input type="checkbox" data-enh="btn-mute"> Tombol Bisukan Chat 🔇</label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
   </div>
 `;
 
@@ -382,8 +806,7 @@ toggleBtn.addEventListener('click', () => {
   sidebar.classList.toggle('open');
   if (sidebar.classList.contains('open')) {
     checkBackendStatus();
-    statusInterval = setInterval(checkBackendStatus, 3000); // Poll every 3 seconds for fast QR rendering
-    updateActiveChatInfo();
+    statusInterval = setInterval(checkBackendStatus, 3000);
   } else {
     clearInterval(statusInterval);
   }
@@ -394,63 +817,7 @@ document.getElementById('wat-close-btn').addEventListener('click', () => {
   clearInterval(statusInterval);
 });
 
-function updateActiveChatInfo() {
-  const activeChatIndicator = document.getElementById('wat-active-chat-indicator');
-  const useActiveChat = document.getElementById('wat-use-active-chat').checked;
-  
-  if (!useActiveChat || !activeChatIndicator) return;
 
-  // Fallback DOM scraper if window.Store is not yet initialized or ready
-  let scrapedName = null;
-  let scrapedJid = null;
-  const header = document.querySelector('#main header');
-  if (header) {
-    const titleEl = header.querySelector('span[title]') || header.querySelector('[data-testid="conversation-info-header-chat-title"]') || header.querySelector('span[dir="auto"]');
-    if (titleEl) {
-      scrapedName = titleEl.getAttribute('title') || titleEl.innerText.trim();
-    }
-    
-    // Scrape phone number / JID from avatar image if available
-    const imgEl = header.querySelector('img');
-    if (imgEl && imgEl.src) {
-      const src = imgEl.src;
-      const match = src.match(/_(\d{9,20})_/) || src.match(/\/(\d{9,20})_/);
-      if (match) {
-        const id = match[1];
-        if (id.startsWith('120363') || id.length > 15) {
-          scrapedJid = `${id}@g.us`;
-        } else {
-          scrapedJid = `${id}@s.whatsapp.net`;
-        }
-      }
-    }
-  }
-
-  if (!activeChatJidOrName && !scrapedName && !scrapedJid) {
-    activeChatIndicator.innerText = 'Buka salah satu chat terlebih dahulu ⚠️';
-    activeChatIndicator.style.color = '#ff9800';
-    activeChatIndicator.style.borderColor = 'rgba(255, 152, 0, 0.2)';
-    activeChatIndicator.style.background = 'rgba(255, 152, 0, 0.05)';
-    return;
-  }
-  
-  if (scrapedJid) {
-    activeChatJidOrName = scrapedJid;
-    activeChatDisplayName = scrapedName || 'Chat';
-  } else if (!activeChatJidOrName && scrapedName) {
-    activeChatJidOrName = scrapedName;
-    activeChatDisplayName = scrapedName;
-  }
-  
-  const targetName = activeChatDisplayName;
-  const targetId = activeChatJidOrName;
-  
-  let displayJid = targetId.includes('@') ? targetId.split('@')[0] : 'Nama';
-  activeChatIndicator.innerText = `Aktif: ${targetName} (${displayJid})`;
-  activeChatIndicator.style.color = '#00e676';
-  activeChatIndicator.style.borderColor = 'rgba(0, 230, 118, 0.2)';
-  activeChatIndicator.style.background = 'rgba(0, 230, 118, 0.05)';
-}
 
 
 // Target Type Selector (Contact vs Group)
@@ -516,7 +883,6 @@ async function checkBackendStatus() {
       connectionView.style.display = 'none';
       mainView.style.display = 'flex';
       qrContainer.style.display = 'none';
-      updateActiveChatInfo(); // Update active chat name/JID in UI
     } else {
       // Backend is online but WhatsApp is NOT connected (requires QR Scan)
       connectionView.style.display = 'flex';
@@ -574,6 +940,23 @@ tabButtons.forEach(btn => {
   });
 });
 
+// Chat Aktif checkbox toggle
+document.getElementById('wat-use-active-chat').addEventListener('change', (e) => {
+  const input = document.getElementById('wat-recipient-jid');
+  const indicator = document.getElementById('wat-active-chat-indicator');
+  const tip = document.getElementById('wat-recipient-tip');
+  if (e.target.checked) {
+    input.style.display = 'none';
+    indicator.style.display = 'block';
+    tip.innerText = 'Mengirim otomatis ke chat yang sedang terbuka di WhatsApp Web.';
+    refreshActiveChatIndicator();
+  } else {
+    input.style.display = 'block';
+    indicator.style.display = 'none';
+    tip.innerText = 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
+  }
+});
+
 // Form Recipient Helper
 function getRecipient() {
   const targetType = document.querySelector('input[name="wat-target-type"]:checked').value;
@@ -586,7 +969,15 @@ function getRecipient() {
     return val;
   }
 
-  // Contact flow - just use phone number input
+  // Contact flow
+  const useActiveChat = document.getElementById('wat-use-active-chat').checked;
+  if (useActiveChat) {
+    if (!activeChatJidOrName) {
+      throw new Error('Tidak ada chat aktif. Silakan buka salah satu chat di WhatsApp Web terlebih dahulu.');
+    }
+    return activeChatJidOrName;
+  }
+
   let jid = document.getElementById('wat-recipient-jid').value.trim();
   if (!jid) {
     throw new Error('Silakan masukkan nomor HP tujuan.');

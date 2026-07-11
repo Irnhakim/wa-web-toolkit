@@ -291,3 +291,108 @@
   font-weight: 600;
   margin-bottom: 4px;
 }
+
+/* ========================================
+   ENHANCEMENT PANEL STYLES
+   ======================================== */
+
+/* Section container */
+.wat-enhance-section {
+  margin-bottom: 4px;
+}
+
+/* Section header row (title + master toggle) */
+.wat-enhance-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e9edef;
+  margin-bottom: 2px;
+}
+
+/* Description text under section header */
+.wat-enhance-desc {
+  font-size: 11px;
+  color: #8696a0;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+/* Individual option row */
+.wat-enh-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #d1d7db;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 2px;
+}
+
+.wat-enh-opt:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.wat-enh-opt input[type="checkbox"] {
+  accent-color: #00b4db;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* iOS-style Toggle Switch */
+.wat-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.wat-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.wat-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: rgba(255,255,255,0.15);
+  border-radius: 20px;
+  transition: background 0.25s;
+}
+
+.wat-toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.25s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.wat-toggle-switch input:checked + .wat-toggle-slider {
+  background: linear-gradient(135deg, #00b4db, #0083b0);
+}
+
+.wat-toggle-switch input:checked + .wat-toggle-slider::before {
+  transform: translateX(16px);
+}
+
+/* Toast notification animation */
+@keyframes watToastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
