@@ -3,6 +3,51 @@ console.log('[WA Web Toolkit] Content script loaded (Baileys client mode).');
 
 let BACKEND_URL = 'http://localhost:3000';
 
+// Inject page-context script to read window.Store.Chat.getActive()
+const injectStoreListener = () => {
+  const script = document.createElement('script');
+  script.textContent = `
+    (function() {
+      let lastJid = null;
+      setInterval(() => {
+        try {
+          if (window.Store && window.Store.Chat && window.Store.Chat.getActive) {
+            const activeChat = window.Store.Chat.getActive();
+            if (activeChat) {
+              const jid = activeChat.id._serialized || activeChat.id;
+              if (jid !== lastJid) {
+                lastJid = jid;
+                window.postMessage({
+                  type: 'WAT_ACTIVE_CHAT',
+                  jid: jid,
+                  name: activeChat.name || activeChat.formattedTitle || 'Chat'
+                }, '*');
+              }
+            }
+          }
+        } catch (e) {}
+      }, 1000);
+    })();
+  `;
+  (document.head || document.documentElement).appendChild(script);
+  script.remove();
+};
+injectStoreListener();
+
+// Active chat detection state
+let activeChatJidOrName = null;
+let activeChatDisplayName = 'Chat';
+
+// Listen to messages from injected script
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'WAT_ACTIVE_CHAT') {
+    const { jid, name } = event.data;
+    activeChatJidOrName = jid;
+    activeChatDisplayName = name;
+    updateActiveChatInfo();
+  }
+});
+
 // 1. Inject Stylesheet
 const linkEl = document.createElement('link');
 linkEl.rel = 'stylesheet';
@@ -32,7 +77,9 @@ const sidebarHTML = `
     <!-- QR Code Render Container -->
     <div id="wat-qr-container" style="display: none; margin-top: 15px; text-align: center; padding: 15px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
       <div style="font-size: 12px; color: #8696a0; margin-bottom: 12px; font-weight: 500; letter-spacing: 0.5px;">PINDAI QR UNTUK LOGIN WHATSAPP</div>
-      <img id="wat-qr-image" style="width: 180px; height: 180px; border-radius: 6px; background: white; padding: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" src="" />
+      <div style="display: flex; justify-content: center;">
+        <div id="wat-qr-image-container" style="display: inline-block; background: white; padding: 10px; border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></div>
+      </div>
       <div style="font-size: 11px; color: #00b4db; margin-top: 12px; font-weight: 600; line-height: 1.4;">
         Buka WhatsApp -> Perangkat Tertaut -> Tautkan Perangkat
       </div>
@@ -55,9 +102,17 @@ const sidebarHTML = `
 
       <!-- Recipient Section -->
       <div class="wat-form-group">
-        <label>Nomor WhatsApp Tujuan</label>
-        <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789">
-        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;">Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <label style="margin-bottom: 0;">Nomor/JID Tujuan</label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #00b4db; cursor: pointer; margin-bottom: 0; font-weight: 500;">
+            <input type="checkbox" id="wat-use-active-chat" checked style="cursor: pointer; accent-color: #00b4db;"> Chat Aktif WA Web
+          </label>
+        </div>
+        <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789" style="display: none;">
+        <div id="wat-active-chat-indicator" style="font-size: 13px; font-weight: 600; padding: 8px 10px; background: rgba(0, 180, 219, 0.08); border: 1px solid rgba(0, 180, 219, 0.15); border-radius: 6px; color: #00b4db; text-align: center;">
+          Mendeteksi chat aktif... 🔍
+        </div>
+        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Mengirim otomatis ke kontak/grup yang sedang Anda buka di WhatsApp Web.</div>
       </div>
 
       <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 15px 0;" />
@@ -279,7 +334,8 @@ const connectionInfo = document.getElementById('wat-connection-status-info');
 const backendUrlInput = document.getElementById('wat-backend-url-input');
 const connectServerBtn = document.getElementById('wat-connect-server-btn');
 const qrContainer = document.getElementById('wat-qr-container');
-const qrImage = document.getElementById('wat-qr-image');
+const qrImageContainer = document.getElementById('wat-qr-image-container');
+let currentQRString = null;
 
 // Load saved backend URL
 chrome.storage.local.get(['backendUrl'], (result) => {
@@ -313,7 +369,7 @@ toggleBtn.addEventListener('click', () => {
   if (sidebar.classList.contains('open')) {
     checkBackendStatus();
     statusInterval = setInterval(checkBackendStatus, 3000); // Poll every 3 seconds for fast QR rendering
-    autofillRecipientFromDOM();
+    updateActiveChatInfo();
   } else {
     clearInterval(statusInterval);
   }
@@ -324,23 +380,45 @@ document.getElementById('wat-close-btn').addEventListener('click', () => {
   clearInterval(statusInterval);
 });
 
-// Autofill recipient if possible from WA Web header
-function autofillRecipientFromDOM() {
-  const header = document.querySelector('#main header');
-  if (!header) return;
+function updateActiveChatInfo() {
+  const activeChatIndicator = document.getElementById('wat-active-chat-indicator');
+  const useActiveChat = document.getElementById('wat-use-active-chat').checked;
   
-  const nameEl = header.querySelector('span[dir="auto"]');
-  if (nameEl) {
-    console.log('[WA Web Toolkit] Current open chat:', nameEl.innerText);
-    let cleanNumber = nameEl.innerText.replace(/[^0-9]/g, '');
-    if (cleanNumber.length >= 9 && (cleanNumber.startsWith('62') || cleanNumber.startsWith('0') || cleanNumber.startsWith('1') || cleanNumber.startsWith('5'))) {
-      if (cleanNumber.startsWith('0')) {
-        cleanNumber = '62' + cleanNumber.substring(1);
-      }
-      document.getElementById('wat-recipient-jid').value = cleanNumber;
-    }
+  if (!useActiveChat || !activeChatIndicator) return;
+
+  if (!activeChatJidOrName) {
+    activeChatIndicator.innerText = 'Buka salah satu chat terlebih dahulu ⚠️';
+    activeChatIndicator.style.color = '#ff9800';
+    activeChatIndicator.style.borderColor = 'rgba(255, 152, 0, 0.2)';
+    activeChatIndicator.style.background = 'rgba(255, 152, 0, 0.05)';
+    return;
   }
+  
+  // Format JID suffix to make it look clean
+  let displayJid = activeChatJidOrName.split('@')[0];
+  activeChatIndicator.innerText = `Aktif: ${activeChatDisplayName} (${displayJid})`;
+  activeChatIndicator.style.color = '#00e676';
+  activeChatIndicator.style.borderColor = 'rgba(0, 230, 118, 0.2)';
+  activeChatIndicator.style.background = 'rgba(0, 230, 118, 0.05)';
 }
+
+// Active chat toggle listener
+document.getElementById('wat-use-active-chat').addEventListener('change', (e) => {
+  const input = document.getElementById('wat-recipient-jid');
+  const indicator = document.getElementById('wat-active-chat-indicator');
+  const tip = document.getElementById('wat-recipient-tip');
+  
+  if (e.target.checked) {
+    input.style.display = 'none';
+    indicator.style.display = 'block';
+    tip.innerText = 'Mengirim otomatis ke kontak/grup yang sedang Anda buka di WhatsApp Web.';
+    updateActiveChatInfo();
+  } else {
+    input.style.display = 'block';
+    indicator.style.display = 'none';
+    tip.innerText = 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
+  }
+});
 
 // 4. Backend Connection & QR Polling
 async function checkBackendStatus() {
@@ -353,6 +431,7 @@ async function checkBackendStatus() {
       connectionView.style.display = 'none';
       mainView.style.display = 'flex';
       qrContainer.style.display = 'none';
+      updateActiveChatInfo(); // Update active chat name/JID in UI
     } else {
       // Backend is online but WhatsApp is NOT connected (requires QR Scan)
       connectionView.style.display = 'flex';
@@ -365,9 +444,21 @@ async function checkBackendStatus() {
       
       if (data.qr) {
         qrContainer.style.display = 'block';
-        qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.qr)}`;
+        if (data.qr !== currentQRString) {
+          currentQRString = data.qr;
+          qrImageContainer.innerHTML = '';
+          new QRCode(qrImageContainer, {
+            text: data.qr,
+            width: 180,
+            height: 180,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        }
       } else {
         qrContainer.style.display = 'none';
+        currentQRString = null;
         connectionInfo.innerText = 'Server Aktif. Menunggu QR Code dari Baileys... ⏳';
       }
     }
@@ -400,6 +491,14 @@ tabButtons.forEach(btn => {
 
 // Form Recipient Helper
 function getRecipient() {
+  const useActiveChat = document.getElementById('wat-use-active-chat').checked;
+  if (useActiveChat) {
+    if (!activeChatJidOrName) {
+      throw new Error('Tidak ada chat aktif terdeteksi. Silakan buka salah satu chat terlebih dahulu atau pilih input manual.');
+    }
+    return activeChatJidOrName;
+  }
+
   let jid = document.getElementById('wat-recipient-jid').value.trim();
   if (!jid) {
     throw new Error('Silakan masukkan nomor tujuan.');

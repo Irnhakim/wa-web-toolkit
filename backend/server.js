@@ -6,6 +6,7 @@ const {
   makeWASocket, 
   useMultiFileAuthState, 
   DisconnectReason,
+  fetchLatestBaileysVersion,
   proto 
 } = require('@whiskeysockets/baileys');
 
@@ -23,8 +24,11 @@ let latestQR = null;
 // Initialize Baileys Connection
 async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+  const { version, isLatest } = await fetchLatestBaileysVersion();
+  console.log(`Menggunakan versi WhatsApp Web: ${version.join('.')}, Terkini: ${isLatest}`);
 
   sock = makeWASocket({
+    version,
     auth: state,
     printQRInTerminal: false, // We will print it manually using qrcode-terminal
     logger: pino({ level: 'silent' }),
@@ -61,12 +65,29 @@ async function connectToWhatsApp() {
   sock.ev.on('creds.update', saveCreds);
 }
 
-// Helper to format JID
-function formatJid(number) {
-  let clean = number.replace(/[^0-9]/g, '');
-  if (clean.includes('@')) return clean;
-  // Personal account format is [number]@s.whatsapp.net
-  return `${clean}@s.whatsapp.net`;
+// Helper to format or resolve JID
+function formatJid(recipient) {
+  if (recipient.includes('@')) return recipient;
+  
+  // If it's purely numbers
+  const clean = recipient.replace(/[^0-9]/g, '');
+  if (clean && clean.length >= 9) {
+    return `${clean}@s.whatsapp.net`;
+  }
+  
+  // Try searching in cached contacts
+  console.log(`[formatJid] Mencari kontak untuk nama: ${recipient}`);
+  const contacts = Object.values(sock.contacts || {});
+  const match = contacts.find(c => 
+    (c.name && c.name.toLowerCase() === recipient.toLowerCase()) || 
+    (c.verifiedName && c.verifiedName.toLowerCase() === recipient.toLowerCase())
+  );
+  if (match) {
+    console.log(`[formatJid] Ditemukan JID: ${match.id} untuk nama ${recipient}`);
+    return match.id;
+  }
+  
+  throw new Error(`Nama kontak "${recipient}" tidak ditemukan. Gunakan nomor HP manual.`);
 }
 
 // Convert URL or base64 to Buffer helper

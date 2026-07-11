@@ -15,6 +15,7 @@
         "https://web.whatsapp.com/*"
       ],
       "js": [
+        "lib/qrcode.min.js",
         "content.js"
       ],
       "run_at": "document_idle"

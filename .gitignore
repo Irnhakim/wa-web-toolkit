@@ -1,0 +1,20 @@
+# Dependency directories
+node_modules/
+
+# WhatsApp session auth folders (sensitive credentials!)
+backend/auth_info/
+auth_info/
+
+# Environmental variables
+.env
+.env.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
