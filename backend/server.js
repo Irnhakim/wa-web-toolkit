@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
 const { 
   makeWASocket, 
   useMultiFileAuthState, 
@@ -21,6 +23,54 @@ app.use(express.json({ limit: '50mb' }));
 let sock = null;
 let isConnected = false;
 let latestQR = null;
+
+// Function to delete the auth folder on logout
+function clearAuthDir() {
+  const authDir = path.join(__dirname, 'auth_info');
+  if (fs.existsSync(authDir)) {
+    try {
+      fs.rmSync(authDir, { recursive: true, force: true });
+      console.log('Folder auth_info berhasil dihapus karena logout/de-otorisasi.');
+    } catch (e) {
+      console.error('Gagal menghapus folder auth_info:', e.message);
+    }
+  }
+}
+
+// Optimization: Periodically clean up old prekeys and unsynced state files to prevent disk bloat
+function runPeriodicCleanup() {
+  const authDir = path.join(__dirname, 'auth_info');
+  if (!fs.existsSync(authDir)) return;
+
+  try {
+    const files = fs.readdirSync(authDir);
+    let count = 0;
+    const now = Date.now();
+    // Prekeys, sessions, and other dynamic data older than 6 hours can be purged
+    const maxAgeMs = 6 * 60 * 60 * 1000; 
+
+    files.forEach(file => {
+      // Keep essential credentials!
+      if (file === 'creds.json') return;
+
+      const filePath = path.join(authDir, file);
+      const stat = fs.statSync(filePath);
+      
+      if (now - stat.mtimeMs > maxAgeMs) {
+        fs.unlinkSync(filePath);
+        count++;
+      }
+    });
+    if (count > 0) {
+      console.log(`[Cleanup] Berhasil membersihkan ${count} file auth_info usang.`);
+    }
+  } catch (e) {
+    console.error('Cleanup auth_info error:', e.message);
+  }
+}
+
+// Run cleanup every 1 hour
+setInterval(runPeriodicCleanup, 60 * 60 * 1000);
 
 // Initialize Baileys Connection
 async function connectToWhatsApp() {
@@ -49,17 +99,27 @@ async function connectToWhatsApp() {
     }
 
     if (connection === 'close') {
-      const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('Koneksi terputus karena:', lastDisconnect.error, '. Menghubungkan kembali:', shouldReconnect);
+      const statusCode = lastDisconnect.error?.output?.statusCode;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+      console.log('Koneksi terputus dengan Status Code:', statusCode, 'error:', lastDisconnect.error);
+      
       isConnected = false;
       latestQR = null;
-      if (shouldReconnect) {
-        connectToWhatsApp();
+
+      if (isLoggedOut) {
+        console.log('User logout atau sesi de-otorisasi (401). Menghapus kredensial lama dan membuat QR baru...');
+        clearAuthDir();
+        setTimeout(connectToWhatsApp, 1500);
+      } else {
+        console.log('Terjadi kesalahan jaringan/koneksi lainnya. Mencoba menghubungkan kembali...');
+        setTimeout(connectToWhatsApp, 3000);
       }
     } else if (connection === 'open') {
       console.log('WhatsApp Bot berhasil terhubung! ✅');
       isConnected = true;
       latestQR = null;
+      // Run a quick cleanup immediately on connection success
+      runPeriodicCleanup();
     }
   });
 
