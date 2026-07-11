@@ -185,7 +185,7 @@ app.post('/api/send-buttons', async (req, res) => {
       }
     };
 
-    await sock.sendMessage(jid, message);
+    await sock.relayMessage(jid, message, {});
 
     res.json({ success: true, message: 'Button message berhasil dikirim!' });
   } catch (err) {
