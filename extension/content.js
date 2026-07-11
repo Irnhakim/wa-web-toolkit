@@ -528,6 +528,11 @@ async function fetchGroups() {
   }
 }
 
+// Fetch groups when dropdown is clicked/focused (stops background polling spam)
+document.getElementById('wat-group-select').addEventListener('focus', () => {
+  fetchGroups();
+});
+
 // 4. Backend Connection & QR Polling
 async function checkBackendStatus() {
   try {
@@ -540,12 +545,6 @@ async function checkBackendStatus() {
       mainView.style.display = 'flex';
       qrContainer.style.display = 'none';
       updateActiveChatInfo(); // Update active chat name/JID in UI
-      
-      // If group picker is visible, refresh groups list
-      const groupPicker = document.getElementById('wat-group-picker-container');
-      if (groupPicker.style.display === 'block') {
-        fetchGroups();
-      }
     } else {
       // Backend is online but WhatsApp is NOT connected (requires QR Scan)
       connectionView.style.display = 'flex';
