@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "WA Web Toolkit",
+  "version": "1.0.0",
+  "description": "Send Interactive Messages (Buttons), Custom Link Previews, and Product Carousels on WhatsApp Web.",
+  "permissions": [
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/wppconnect-wa.js",
+        "inject.js"
+      ],
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "WA Web Toolkit"
+  }
+}

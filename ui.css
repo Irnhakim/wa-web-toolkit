@@ -1,0 +1,293 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* Floating Trigger Button */
+#wat-toggle-btn {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00b4db, #0083b0);
+  box-shadow: 0 4px 15px rgba(0, 180, 219, 0.4);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 999999;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: none;
+}
+
+#wat-toggle-btn:hover {
+  transform: scale(1.1) rotate(15deg);
+  box-shadow: 0 6px 20px rgba(0, 180, 219, 0.6);
+}
+
+/* Sidebar Panel */
+#wat-sidebar {
+  position: fixed;
+  top: 0;
+  right: -380px;
+  width: 360px;
+  height: 100vh;
+  background: rgba(19, 28, 33, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.5);
+  z-index: 999998;
+  transition: right 0.4s cubic-bezier(0.075, 0.82, 0.165, 1);
+  font-family: 'Outfit', sans-serif;
+  color: #e9edef;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+#wat-sidebar.open {
+  right: 0;
+}
+
+/* Sidebar Header */
+.wat-header {
+  padding: 20px;
+  background: rgba(32, 44, 51, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wat-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #00e676, #00b4db);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.wat-close-btn {
+  background: none;
+  border: none;
+  color: #aebac1;
+  font-size: 20px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.wat-close-btn:hover {
+  color: #ff5252;
+}
+
+/* Tabs */
+.wat-tabs {
+  display: flex;
+  background: rgba(32, 44, 51, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wat-tab-btn {
+  flex: 1;
+  padding: 12px 5px;
+  background: none;
+  border: none;
+  color: #8696a0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-bottom: 2px solid transparent;
+}
+
+.wat-tab-btn:hover {
+  color: #e9edef;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.wat-tab-btn.active {
+  color: #00e676;
+  border-bottom: 2px solid #00e676;
+  background: rgba(0, 230, 118, 0.05);
+}
+
+/* Body Content */
+.wat-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.wat-tab-content {
+  display: none;
+}
+
+.wat-tab-content.active {
+  display: block;
+}
+
+/* Form Styling */
+.wat-form-group {
+  margin-bottom: 16px;
+}
+
+.wat-form-group label {
+  display: block;
+  font-size: 12px;
+  color: #8696a0;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wat-input, .wat-textarea, .wat-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: #2a3942;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  color: #e9edef;
+  font-size: 14px;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.wat-input:focus, .wat-textarea:focus, .wat-select:focus {
+  outline: none;
+  border-color: #00b4db;
+  box-shadow: 0 0 5px rgba(0, 180, 219, 0.3);
+}
+
+.wat-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Action Buttons */
+.wat-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.wat-btn-primary {
+  background: linear-gradient(135deg, #00e676, #00b0ff);
+  color: #111b21;
+}
+
+.wat-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 230, 118, 0.3);
+}
+
+.wat-btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e9edef;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 10px;
+}
+
+.wat-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Button Builder Items */
+.wat-button-list {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.wat-button-item {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.wat-button-item span {
+  flex: 1;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wat-remove-btn {
+  background: none;
+  border: none;
+  color: #ff5252;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* Status Indicator */
+.wat-status {
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 15px;
+  text-align: center;
+  display: none;
+}
+
+.wat-status.success {
+  display: block;
+  background: rgba(0, 230, 118, 0.1);
+  color: #00e676;
+  border: 1px solid rgba(0, 230, 118, 0.2);
+}
+
+.wat-status.error {
+  display: block;
+  background: rgba(255, 82, 82, 0.1);
+  color: #ff5252;
+  border: 1px solid rgba(255, 82, 82, 0.2);
+}
+
+.wat-status.info {
+  display: block;
+  background: rgba(0, 180, 219, 0.1);
+  color: #00b4db;
+  border: 1px solid rgba(0, 180, 219, 0.2);
+}
+
+/* Card Lists for Carousel Builder */
+.wat-card-builder {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wat-card-item {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border-left: 3px solid #00b4db;
+}
+
+.wat-card-header-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
