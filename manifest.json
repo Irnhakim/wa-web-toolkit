@@ -21,7 +21,8 @@
     {
       "resources": [
         "lib/wppconnect-wa.js",
-        "inject.js"
+        "inject.js",
+        "ui.css"
       ],
       "matches": [
         "https://web.whatsapp.com/*"

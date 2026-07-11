@@ -231,7 +231,7 @@ tabButtons.forEach(btn => {
 });
 
 // 6. Form Fields Toggle (Recipient and Button type)
-const recipientTypeRadios = document.querySelectorAll('name="wat-recipient-type"');
+const recipientTypeRadios = document.querySelectorAll('[name="wat-recipient-type"]');
 const customRecipientInput = document.getElementById('wat-custom-recipient');
 const activeChatInfo = document.getElementById('wat-active-chat-info');
 
