@@ -26,6 +26,31 @@
   box-shadow: 0 6px 20px rgba(0, 180, 219, 0.6);
 }
 
+/* Styles when injected inside WhatsApp's side rail */
+#wat-toggle-btn.in-rail {
+  position: relative !important;
+  bottom: auto !important;
+  right: auto !important;
+  width: 40px !important;
+  height: 40px !important;
+  margin: 8px auto !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 20px !important;
+  z-index: 10 !important;
+  transition: background 0.2s, transform 0.2s !important;
+}
+
+#wat-toggle-btn.in-rail:hover {
+  background: rgba(0, 180, 219, 0.2) !important;
+  transform: scale(1.05) !important;
+  box-shadow: none !important;
+}
+
 /* Sidebar Panel */
 #wat-sidebar {
   position: fixed;

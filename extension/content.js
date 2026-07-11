@@ -155,7 +155,45 @@ const sidebarHTML = `
 const toggleBtn = document.createElement('button');
 toggleBtn.id = 'wat-toggle-btn';
 toggleBtn.innerHTML = '⚡';
-document.body.appendChild(toggleBtn);
+
+// Inject toggleBtn directly into WhatsApp Web's left navigation rail
+function injectToggleButton() {
+  // Find the side navigation container (navigation rail) in WhatsApp Web
+  const sideRail = document.querySelector('header') || document.querySelector('#side').parentNode.querySelector('nav') || document.querySelector('[role="navigation"]') || document.querySelector('header').parentNode;
+  
+  if (sideRail) {
+    // Try to find the Meta AI button container or last icon to insert after
+    const metaAiIcon = sideRail.querySelector('[data-testid="meta-ai-icon"]') || sideRail.querySelector('span[data-icon="meta-ai"]') || sideRail.querySelector('a[href*="meta"]');
+    
+    if (metaAiIcon) {
+      // Find the closest list item or wrapper to place it cleanly
+      const iconContainer = metaAiIcon.closest('div') || metaAiIcon;
+      iconContainer.parentNode.insertBefore(toggleBtn, iconContainer.nextSibling);
+      toggleBtn.classList.add('in-rail');
+    } else {
+      // Just append to the end of the side rail
+      sideRail.appendChild(toggleBtn);
+      toggleBtn.classList.add('in-rail');
+    }
+  } else {
+    // Fallback to body floating button if layout changes
+    document.body.appendChild(toggleBtn);
+  }
+}
+
+// Run injection
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectToggleButton);
+} else {
+  // WhatsApp takes time to render, poll until side rail is present
+  const railPoll = setInterval(() => {
+    const rail = document.querySelector('[role="navigation"]') || document.querySelector('header');
+    if (rail) {
+      clearInterval(railPoll);
+      injectToggleButton();
+    }
+  }, 1000);
+}
 
 const sidebar = document.createElement('div');
 sidebar.id = 'wat-sidebar';
@@ -311,49 +349,55 @@ async function checkBackendStatus() {
     
     if (data.connected) {
       // Backend is online and WhatsApp is fully connected!
-      connectionView.style.display = 'none';
-      mainView.style.display = 'flex';
-      qrContainer.style.display = 'none';
+      if (connectionView) connectionView.style.display = 'none';
+      if (mainView) mainView.style.display = 'flex';
+      if (qrContainer) qrContainer.style.display = 'none';
     } else {
       // Backend is online but WhatsApp is NOT connected (requires QR Scan)
-      connectionView.style.display = 'flex';
-      mainView.style.display = 'none';
+      if (connectionView) connectionView.style.display = 'flex';
+      if (mainView) mainView.style.display = 'none';
       
-      connectionInfo.innerText = 'Server Aktif. Scan QR Code di bawah untuk login WhatsApp ⚠️';
-      connectionInfo.style.color = '#ff9800';
-      connectionInfo.style.background = 'rgba(255, 152, 0, 0.08)';
-      connectionInfo.style.borderColor = 'rgba(255, 152, 0, 0.15)';
+      if (connectionInfo) {
+        connectionInfo.innerText = 'Server Aktif. Scan QR Code di bawah untuk login WhatsApp ⚠️';
+        connectionInfo.style.color = '#ff9800';
+        connectionInfo.style.background = 'rgba(255, 152, 0, 0.08)';
+        connectionInfo.style.borderColor = 'rgba(255, 152, 0, 0.15)';
+      }
       
       if (data.qr) {
-        qrContainer.style.display = 'block';
+        if (qrContainer) qrContainer.style.display = 'block';
         if (data.qr !== currentQRString) {
           currentQRString = data.qr;
-          qrImageContainer.innerHTML = '';
-          new QRCode(qrImageContainer, {
-            text: data.qr,
-            width: 180,
-            height: 180,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.M
-          });
+          if (qrImageContainer) {
+            qrImageContainer.innerHTML = '';
+            new QRCode(qrImageContainer, {
+              text: data.qr,
+              width: 180,
+              height: 180,
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.M
+            });
+          }
         }
       } else {
-        qrContainer.style.display = 'none';
+        if (qrContainer) qrContainer.style.display = 'none';
         currentQRString = null;
-        connectionInfo.innerText = 'Server Aktif. Menunggu QR Code dari Baileys... ⏳';
+        if (connectionInfo) connectionInfo.innerText = 'Server Aktif. Menunggu QR Code dari Baileys... ⏳';
       }
     }
   } catch (err) {
     // Backend is offline
-    connectionView.style.display = 'flex';
-    mainView.style.display = 'none';
-    qrContainer.style.display = 'none';
+    if (connectionView) connectionView.style.display = 'flex';
+    if (mainView) mainView.style.display = 'none';
+    if (qrContainer) qrContainer.style.display = 'none';
     
-    connectionInfo.innerText = 'Server Offline. Jalankan Node.js Backend lokal Anda ❌';
-    connectionInfo.style.color = '#ff5252';
-    connectionInfo.style.background = 'rgba(255, 82, 82, 0.08)';
-    connectionInfo.style.borderColor = 'rgba(255, 82, 82, 0.15)';
+    if (connectionInfo) {
+      connectionInfo.innerText = 'Server Offline. Jalankan Node.js Backend lokal Anda ❌';
+      connectionInfo.style.color = '#ff5252';
+      connectionInfo.style.background = 'rgba(255, 82, 82, 0.08)';
+      connectionInfo.style.borderColor = 'rgba(255, 82, 82, 0.15)';
+    }
   }
 }
 
