@@ -386,7 +386,17 @@ function updateActiveChatInfo() {
   
   if (!useActiveChat || !activeChatIndicator) return;
 
-  if (!activeChatJidOrName) {
+  // Fallback DOM scraper if window.Store is not yet initialized or ready
+  let scrapedName = null;
+  const header = document.querySelector('#main header');
+  if (header) {
+    const nameEl = header.querySelector('span[dir="auto"]');
+    if (nameEl) {
+      scrapedName = nameEl.innerText.trim();
+    }
+  }
+
+  if (!activeChatJidOrName && !scrapedName) {
     activeChatIndicator.innerText = 'Buka salah satu chat terlebih dahulu ⚠️';
     activeChatIndicator.style.color = '#ff9800';
     activeChatIndicator.style.borderColor = 'rgba(255, 152, 0, 0.2)';
@@ -394,9 +404,16 @@ function updateActiveChatInfo() {
     return;
   }
   
-  // Format JID suffix to make it look clean
-  let displayJid = activeChatJidOrName.split('@')[0];
-  activeChatIndicator.innerText = `Aktif: ${activeChatDisplayName} (${displayJid})`;
+  const targetName = activeChatJidOrName ? activeChatDisplayName : scrapedName;
+  const targetId = activeChatJidOrName || scrapedName;
+  
+  if (!activeChatJidOrName && scrapedName) {
+    activeChatJidOrName = scrapedName;
+    activeChatDisplayName = scrapedName;
+  }
+  
+  let displayJid = targetId.includes('@') ? targetId.split('@')[0] : 'Nama';
+  activeChatIndicator.innerText = `Aktif: ${targetName} (${displayJid})`;
   activeChatIndicator.style.color = '#00e676';
   activeChatIndicator.style.borderColor = 'rgba(0, 230, 118, 0.2)';
   activeChatIndicator.style.background = 'rgba(0, 230, 118, 0.05)';

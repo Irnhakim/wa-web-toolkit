@@ -66,7 +66,7 @@ async function connectToWhatsApp() {
 }
 
 // Helper to format or resolve JID
-function formatJid(recipient) {
+async function formatJid(recipient) {
   if (recipient.includes('@')) return recipient;
   
   // If it's purely numbers
@@ -87,7 +87,22 @@ function formatJid(recipient) {
     return match.id;
   }
   
-  throw new Error(`Nama kontak "${recipient}" tidak ditemukan. Gunakan nomor HP manual.`);
+  // Try searching in participating groups
+  try {
+    console.log(`[formatJid] Mencari di daftar grup untuk: ${recipient}`);
+    const groups = await sock.groupFetchAllParticipating();
+    const groupMatch = Object.values(groups).find(g => 
+      g.subject && g.subject.toLowerCase() === recipient.toLowerCase()
+    );
+    if (groupMatch) {
+      console.log(`[formatJid] Ditemukan JID Grup: ${groupMatch.id} untuk nama ${recipient}`);
+      return groupMatch.id;
+    }
+  } catch (err) {
+    console.error('Gagal mencari di daftar grup:', err);
+  }
+  
+  throw new Error(`Tujuan "${recipient}" tidak ditemukan. Silakan gunakan nomor HP manual.`);
 }
 
 // Convert URL or base64 to Buffer helper
@@ -118,54 +133,59 @@ app.post('/api/send-buttons', async (req, res) => {
 
   try {
     const { recipient, text, title, footer, buttons } = req.body;
-    const jid = formatJid(recipient);
+    const jid = await formatJid(recipient);
 
-    console.log(`[Backend] Mengirim button message ke ${jid}`);
+    console.log(`[Backend] Mengirim interactive button message ke ${jid}`);
 
-    // Standard buttons (Quick replies) vs Template buttons (URL/Phone)
-    const isTemplate = buttons.some(b => b.type === 'url' || b.type === 'phone');
+    const formattedButtons = buttons.map((btn, index) => {
+      if (btn.type === 'url') {
+        return {
+          name: 'cta_url',
+          buttonParamsJson: JSON.stringify({
+            display_text: btn.text,
+            url: btn.value,
+            merchant_url: btn.value
+          })
+        };
+      } else if (btn.type === 'phone') {
+        return {
+          name: 'cta_call',
+          buttonParamsJson: JSON.stringify({
+            display_text: btn.text,
+            id: btn.value
+          })
+        };
+      } else {
+        return {
+          name: 'quick_reply',
+          buttonParamsJson: JSON.stringify({
+            display_text: btn.text,
+            id: btn.id || `btn_${index}`
+          })
+        };
+      }
+    });
 
-    if (isTemplate) {
-      // Send template buttons
-      const templateButtons = buttons.map((btn, index) => {
-        if (btn.type === 'url') {
-          return {
-            index: index + 1,
-            urlButton: { displayText: btn.text, url: btn.value }
-          };
-        } else if (btn.type === 'phone') {
-          return {
-            index: index + 1,
-            callButton: { displayText: btn.text, phoneNumber: btn.value }
-          };
-        } else {
-          return {
-            index: index + 1,
-            quickReplyButton: { displayText: btn.text, id: btn.id || `btn_${index}` }
-          };
+    const message = {
+      viewOnceMessage: {
+        message: {
+          messageContextInfo: {
+            deviceListMetadata: {},
+            deviceListMetadataVersion: 2
+          },
+          interactiveMessage: proto.Message.InteractiveMessage.create({
+            body: proto.Message.InteractiveMessage.Body.create({ text: text }),
+            footer: footer ? proto.Message.InteractiveMessage.Footer.create({ text: footer }) : undefined,
+            header: title ? proto.Message.InteractiveMessage.Header.create({ title: title, hasMediaAttachment: false }) : undefined,
+            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+              buttons: formattedButtons
+            })
+          })
         }
-      });
+      }
+    };
 
-      await sock.sendMessage(jid, {
-        text: text,
-        footer: footer || undefined,
-        templateButtons: templateButtons
-      });
-    } else {
-      // Send interactive reply buttons
-      const formattedButtons = buttons.map((btn, index) => ({
-        buttonId: btn.id || `btn_${index}`,
-        buttonText: { displayText: btn.text },
-        type: 1 // 1 is response button
-      }));
-
-      await sock.sendMessage(jid, {
-        text: text,
-        footer: footer || undefined,
-        buttons: formattedButtons,
-        headerType: 1
-      });
-    }
+    await sock.sendMessage(jid, message);
 
     res.json({ success: true, message: 'Button message berhasil dikirim!' });
   } catch (err) {
@@ -182,7 +202,7 @@ app.post('/api/send-preview', async (req, res) => {
 
   try {
     const { recipient, text, url, title, description, siteName, thumbnail } = req.body;
-    const jid = formatJid(recipient);
+    const jid = await formatJid(recipient);
 
     console.log(`[Backend] Mengirim link preview ke ${jid}`);
 
@@ -222,7 +242,7 @@ app.post('/api/send-carousel', async (req, res) => {
 
   try {
     const { recipient, cards } = req.body;
-    const jid = formatJid(recipient);
+    const jid = await formatJid(recipient);
 
     console.log(`[Backend] Mengirim carousel cards ke ${jid}`);
 
@@ -291,7 +311,7 @@ app.post('/api/send-contact', async (req, res) => {
 
   try {
     const { recipient, name, org, phone } = req.body;
-    const jid = formatJid(recipient);
+    const jid = await formatJid(recipient);
 
     console.log(`[Backend] Mengirim kartu kontak ke ${jid}`);
 
@@ -325,7 +345,7 @@ app.post('/api/send-location', async (req, res) => {
 
   try {
     const { recipient, name, address, latitude, longitude } = req.body;
-    const jid = formatJid(recipient);
+    const jid = await formatJid(recipient);
 
     console.log(`[Backend] Mengirim lokasi kustom ke ${jid}`);
 
@@ -353,7 +373,7 @@ app.post('/api/send-list', async (req, res) => {
 
   try {
     const { recipient, title, text, footer, buttonText, options } = req.body;
-    const jid = formatJid(recipient);
+    const jid = await formatJid(recipient);
 
     console.log(`[Backend] Mengirim list menu ke ${jid}`);
 
