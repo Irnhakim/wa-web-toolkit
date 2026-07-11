@@ -349,6 +349,18 @@ document.getElementById('wat-add-btn-trigger').addEventListener('click', () => {
     return;
   }
 
+  // Validate mixing of button types (WhatsApp API limitation)
+  if (messageButtons.length > 0) {
+    const hasQuickReply = messageButtons.some(b => b.type === 'quick_reply');
+    const hasCTA = messageButtons.some(b => b.type === 'url' || b.type === 'phone');
+    const currentIsQuickReply = (type === 'quick_reply');
+
+    if ((currentIsQuickReply && hasCTA) || (!currentIsQuickReply && hasQuickReply)) {
+      showStatus('error', 'Batasan WhatsApp: Tidak bisa mencampur tombol Balas (Quick Reply) dengan tombol Tautan/Telepon (CTA) dalam satu pesan.');
+      return;
+    }
+  }
+
   messageButtons.push({ type, text, value: val });
   document.getElementById('wat-new-btn-text').value = '';
   newBtnValInput.value = '';
@@ -412,6 +424,7 @@ function showStatus(type, message) {
   const box = document.getElementById('wat-status-box');
   box.className = `wat-status ${type}`;
   box.innerText = message;
+  box.style.display = 'block';
   
   // Clear after 5 seconds
   setTimeout(() => {
