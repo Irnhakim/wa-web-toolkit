@@ -231,20 +231,22 @@ app.post('/api/send-preview', async (req, res) => {
     const thumbBuffer = isBase64 ? getThumbnailBuffer(thumbnail) : undefined;
     const thumbUrl = !isBase64 && thumbnail ? thumbnail : undefined;
 
+    const adReply = {
+      title: title || undefined,
+      body: description || undefined,
+      mediaType: (thumbUrl || thumbBuffer) ? 1 : 0,
+      sourceUrl: url,
+      renderLargerThumbnail: !!(thumbUrl || thumbBuffer),
+      showAdAttribution: false
+    };
+
+    if (thumbUrl) adReply.thumbnailUrl = thumbUrl;
+    if (thumbBuffer) adReply.thumbnail = thumbBuffer;
+
     await sock.sendMessage(jid, {
       text: `${text}\n\n${url}`,
       contextInfo: {
-        externalAdReply: {
-          title: title || undefined,
-          body: description || undefined,
-          mediaType: 1, // 1 = image
-          thumbnailUrl: thumbUrl || undefined,
-          thumbnail: thumbBuffer || undefined,
-          sourceUrl: url,
-          mediaUrl: url,
-          renderLargerThumbnail: true, // premium look!
-          showAdAttribution: false
-        }
+        externalAdReply: adReply
       }
     });
 
