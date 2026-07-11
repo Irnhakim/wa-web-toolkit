@@ -13,7 +13,7 @@ const {
   makeCacheableSignalKeyStore,
   proto 
 } = require('@whiskeysockets/baileys');
-const NodeCache = require('@cacheable/node-cache');
+const { NodeCache } = require('@cacheable/node-cache');
 
 const app = express();
 const PORT = 3000;
