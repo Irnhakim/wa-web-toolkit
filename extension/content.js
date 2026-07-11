@@ -148,10 +148,8 @@ const sidebarHTML = `
           Buka WhatsApp -> Perangkat Tertaut -> Tautkan Perangkat
         </div>
       </div>
-    </div>
-
-    </div>
-;
+  </div>
+`;
 
 // Create elements
 const toggleBtn = document.createElement('button');

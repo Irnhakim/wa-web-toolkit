@@ -17,10 +17,15 @@ const ENH_CSS = {
     [data-testid="thumb-img"],
     [data-testid="default-user"],
     [data-testid="avatar"],
+    img[src*="avatar"],
+    img[src*="profile"],
     ._aig- img,
-    .zoWT4 img { filter: blur(8px) !important; transition: filter 0.2s; }
+    .zoWT4 img,
+    div[style*="background-image"] { filter: blur(8px) !important; transition: filter 0.2s; }
     [data-testid="thumb-img"]:hover,
-    ._aig- img:hover { filter: blur(0) !important; }
+    img[src*="avatar"]:hover,
+    img[src*="profile"]:hover,
+    div[style*="background-image"]:hover { filter: blur(0) !important; }
   `,
   'blur-previews': `
     [data-testid="last-msg-status"],
@@ -57,7 +62,12 @@ const ENH_CSS = {
     [data-testid="msg-dblcheck"],
     [data-testid="msg-dblcheck-ack"],
     span[data-icon="msg-dblcheck"],
-    span[data-icon="msg-dblcheck-ack"] { visibility: hidden !important; }
+    span[data-icon="msg-dblcheck-ack"],
+    span[data-icon="double-check-blue"],
+    span[data-icon="double-check-gray"],
+    span[data-icon="single-check"],
+    [data-testid="status-dblcheck"],
+    [data-testid="status-dblcheck-ack"] { visibility: hidden !important; display: none !important; }
   `,
   'hide-online': `
     [data-testid="conversation-info-header-chat-title"] + div span,

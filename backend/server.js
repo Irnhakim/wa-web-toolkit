@@ -101,7 +101,7 @@ async function connectToWhatsApp() {
     if (connection === 'close') {
       const statusCode = lastDisconnect.error?.output?.statusCode;
       const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
-      console.log('Koneksi terputus dengan Status Code:', statusCode, 'error:', lastDisconnect.error);
+      console.log(`Koneksi terputus (Status: ${statusCode || 'unknown'}).`);
       
       isConnected = false;
       latestQR = null;
