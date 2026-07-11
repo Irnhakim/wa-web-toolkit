@@ -430,21 +430,24 @@ tabButtons.forEach(btn => {
 });
 
 // Chat Aktif checkbox toggle
-document.getElementById('wat-use-active-chat').addEventListener('change', (e) => {
-  const input = document.getElementById('wat-recipient-jid');
-  const indicator = document.getElementById('wat-active-chat-indicator');
-  const tip = document.getElementById('wat-recipient-tip');
-  if (e.target.checked) {
-    input.style.display = 'none';
-    indicator.style.display = 'block';
-    tip.innerText = 'Mengirim otomatis ke chat yang sedang terbuka di WhatsApp Web.';
-    refreshActiveChatIndicator();
-  } else {
-    input.style.display = 'block';
-    indicator.style.display = 'none';
-    tip.innerText = 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
-  }
-});
+const useActiveChatCheckbox = document.getElementById('wat-use-active-chat');
+if (useActiveChatCheckbox) {
+  useActiveChatCheckbox.addEventListener('change', (e) => {
+    const input = document.getElementById('wat-recipient-jid');
+    const indicator = document.getElementById('wat-active-chat-indicator');
+    const tip = document.getElementById('wat-recipient-tip');
+    if (e.target.checked) {
+      if (input) input.style.display = 'none';
+      if (indicator) indicator.style.display = 'block';
+      if (tip) tip.innerText = 'Mengirim otomatis ke chat yang sedang terbuka di WhatsApp Web.';
+      refreshActiveChatIndicator();
+    } else {
+      if (input) input.style.display = 'block';
+      if (indicator) indicator.style.display = 'none';
+      if (tip) tip.innerText = 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
+    }
+  });
+}
 
 // Form Recipient Helper
 function getRecipient() {
@@ -482,14 +485,16 @@ function getRecipient() {
 const newBtnTypeSelect = document.getElementById('wat-new-btn-type');
 const newBtnValInput = document.getElementById('wat-new-btn-val');
 
-newBtnTypeSelect.addEventListener('change', (e) => {
-  if (e.target.value === 'quick_reply') {
-    newBtnValInput.style.display = 'none';
-  } else {
-    newBtnValInput.style.display = 'block';
-    newBtnValInput.placeholder = e.target.value === 'url' ? 'https://example.com' : 'Nomor HP: +6281234...';
-  }
-});
+if (newBtnTypeSelect && newBtnValInput) {
+  newBtnTypeSelect.addEventListener('change', (e) => {
+    if (e.target.value === 'quick_reply') {
+      newBtnValInput.style.display = 'none';
+    } else {
+      newBtnValInput.style.display = 'block';
+      newBtnValInput.placeholder = e.target.value === 'url' ? 'https://example.com' : 'Nomor HP: +6281234...';
+    }
+  });
+}
 
 // 6. Data Builders & Renderers
 let messageButtons = []; // max 3
