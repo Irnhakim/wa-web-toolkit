@@ -102,17 +102,39 @@ const sidebarHTML = `
 
       <!-- Recipient Section -->
       <div class="wat-form-group">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-          <label style="margin-bottom: 0;">Nomor/JID Tujuan</label>
-          <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #00b4db; cursor: pointer; margin-bottom: 0; font-weight: 500;">
-            <input type="checkbox" id="wat-use-active-chat" checked style="cursor: pointer; accent-color: #00b4db;"> Chat Aktif WA Web
+        <label>Kirim Ke</label>
+        <div style="display: flex; gap: 15px; margin-bottom: 8px;">
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #fff; cursor: pointer; font-weight: 500; margin-bottom: 0;">
+            <input type="radio" name="wat-target-type" value="contact" checked style="cursor: pointer; accent-color: #00b4db;"> Kontak
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #fff; cursor: pointer; font-weight: 500; margin-bottom: 0;">
+            <input type="radio" name="wat-target-type" value="group" style="cursor: pointer; accent-color: #00b4db;"> Grup WhatsApp
           </label>
         </div>
-        <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789" style="display: none;">
-        <div id="wat-active-chat-indicator" style="font-size: 13px; font-weight: 600; padding: 8px 10px; background: rgba(0, 180, 219, 0.08); border: 1px solid rgba(0, 180, 219, 0.15); border-radius: 6px; color: #00b4db; text-align: center;">
-          Mendeteksi chat aktif... 🔍
+
+        <!-- CONTACT PICKER FIELDS -->
+        <div id="wat-contact-picker-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0; font-size: 11px; color: #8696a0;">Nomor/JID Tujuan</label>
+            <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #00b4db; cursor: pointer; margin-bottom: 0; font-weight: 500;">
+              <input type="checkbox" id="wat-use-active-chat" checked style="cursor: pointer; accent-color: #00b4db;"> Chat Aktif WA Web
+            </label>
+          </div>
+          <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789" style="display: none;">
+          <div id="wat-active-chat-indicator" style="font-size: 13px; font-weight: 600; padding: 8px 10px; background: rgba(0, 180, 219, 0.08); border: 1px solid rgba(0, 180, 219, 0.15); border-radius: 6px; color: #00b4db; text-align: center;">
+            Mendeteksi chat aktif... 🔍
+          </div>
         </div>
-        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Mengirim otomatis ke kontak/grup yang sedang Anda buka di WhatsApp Web.</div>
+
+        <!-- GROUP PICKER FIELDS -->
+        <div id="wat-group-picker-container" style="display: none;">
+          <label style="font-size: 11px; color: #8696a0; margin-bottom: 5px; display: block;">Pilih Grup WhatsApp</label>
+          <select id="wat-group-select" class="wat-select" style="width: 100%;">
+            <option value="">Memuat daftar grup... ⏳</option>
+          </select>
+        </div>
+        
+        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Mengirim otomatis ke kontak yang sedang Anda buka di WhatsApp Web.</div>
       </div>
 
       <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 15px 0;" />
@@ -447,7 +469,7 @@ document.getElementById('wat-use-active-chat').addEventListener('change', (e) =>
   if (e.target.checked) {
     input.style.display = 'none';
     indicator.style.display = 'block';
-    tip.innerText = 'Mengirim otomatis ke kontak/grup yang sedang Anda buka di WhatsApp Web.';
+    tip.innerText = 'Mengirim otomatis ke kontak yang sedang Anda buka di WhatsApp Web.';
     updateActiveChatInfo();
   } else {
     input.style.display = 'block';
@@ -455,6 +477,56 @@ document.getElementById('wat-use-active-chat').addEventListener('change', (e) =>
     tip.innerText = 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
   }
 });
+
+// Target Type Selector (Contact vs Group)
+document.querySelectorAll('input[name="wat-target-type"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    const contactPicker = document.getElementById('wat-contact-picker-container');
+    const groupPicker = document.getElementById('wat-group-picker-container');
+    const tip = document.getElementById('wat-recipient-tip');
+    
+    if (e.target.value === 'group') {
+      contactPicker.style.display = 'none';
+      groupPicker.style.display = 'block';
+      tip.innerText = 'Pilih salah satu grup WhatsApp dari daftar di atas untuk mengirim pesan.';
+      fetchGroups();
+    } else {
+      contactPicker.style.display = 'block';
+      groupPicker.style.display = 'none';
+      const useActiveChat = document.getElementById('wat-use-active-chat').checked;
+      tip.innerText = useActiveChat 
+        ? 'Mengirim otomatis ke kontak yang sedang Anda buka di WhatsApp Web.'
+        : 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
+    }
+  });
+});
+
+// Fetch Groups from Backend
+async function fetchGroups() {
+  const select = document.getElementById('wat-group-select');
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/groups`);
+    const data = await res.json();
+    if (data.success && data.groups) {
+      select.innerHTML = '';
+      if (data.groups.length === 0) {
+        select.innerHTML = '<option value="">Tidak ada grup diikuti</option>';
+        return;
+      }
+      data.groups.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.id;
+        opt.innerText = g.subject || 'Grup Tanpa Nama';
+        select.appendChild(opt);
+      });
+    } else {
+      select.innerHTML = '<option value="">Gagal memuat daftar grup</option>';
+    }
+  } catch (e) {
+    console.error(e);
+    select.innerHTML = '<option value="">Gagal menghubungi server backend</option>';
+  }
+}
 
 // 4. Backend Connection & QR Polling
 async function checkBackendStatus() {
@@ -468,6 +540,12 @@ async function checkBackendStatus() {
       mainView.style.display = 'flex';
       qrContainer.style.display = 'none';
       updateActiveChatInfo(); // Update active chat name/JID in UI
+      
+      // If group picker is visible, refresh groups list
+      const groupPicker = document.getElementById('wat-group-picker-container');
+      if (groupPicker.style.display === 'block') {
+        fetchGroups();
+      }
     } else {
       // Backend is online but WhatsApp is NOT connected (requires QR Scan)
       connectionView.style.display = 'flex';
@@ -527,6 +605,17 @@ tabButtons.forEach(btn => {
 
 // Form Recipient Helper
 function getRecipient() {
+  const targetType = document.querySelector('input[name="wat-target-type"]:checked').value;
+  if (targetType === 'group') {
+    const select = document.getElementById('wat-group-select');
+    const val = select.value;
+    if (!val) {
+      throw new Error('Silakan pilih salah satu grup WhatsApp dari daftar.');
+    }
+    return val;
+  }
+
+  // Contact flow
   const useActiveChat = document.getElementById('wat-use-active-chat').checked;
   if (useActiveChat) {
     if (!activeChatJidOrName) {

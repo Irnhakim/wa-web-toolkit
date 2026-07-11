@@ -406,6 +406,29 @@ app.post('/api/send-list', async (req, res) => {
   }
 });
 
+// 7. Get Groups API
+app.get('/api/groups', async (req, res) => {
+  if (!isConnected) {
+    return res.status(500).json({ success: false, message: 'WhatsApp Bot belum terhubung.' });
+  }
+
+  try {
+    console.log('[Backend] Mengambil daftar grup WhatsApp...');
+    const groups = await sock.groupFetchAllParticipating();
+    const groupList = Object.values(groups).map(g => ({
+      id: g.id,
+      subject: g.subject
+    }));
+
+    groupList.sort((a, b) => (a.subject || '').localeCompare(b.subject || ''));
+
+    res.json({ success: true, groups: groupList });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // Start Express Server
 app.listen(PORT, () => {
   console.log(`\n=============================================================`);
