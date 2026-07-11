@@ -158,25 +158,35 @@ toggleBtn.innerHTML = '⚡';
 
 // Inject toggleBtn directly into WhatsApp Web's left navigation rail
 function injectToggleButton() {
-  // Find the side navigation container (navigation rail) in WhatsApp Web
-  const sideRail = document.querySelector('header') || document.querySelector('#side').parentNode.querySelector('nav') || document.querySelector('[role="navigation"]') || document.querySelector('header').parentNode;
+  // Try to find the Meta AI button container
+  const metaAiIcon = document.querySelector('[data-testid="meta-ai-icon"]') || 
+                     document.querySelector('span[data-icon="meta-ai"]') || 
+                     document.querySelector('a[href*="meta"]');
   
-  if (sideRail) {
-    // Try to find the Meta AI button container or last icon to insert after
-    const metaAiIcon = sideRail.querySelector('[data-testid="meta-ai-icon"]') || sideRail.querySelector('span[data-icon="meta-ai"]') || sideRail.querySelector('a[href*="meta"]');
-    
-    if (metaAiIcon) {
-      // Find the closest list item or wrapper to place it cleanly
-      const iconContainer = metaAiIcon.closest('div') || metaAiIcon;
-      iconContainer.parentNode.insertBefore(toggleBtn, iconContainer.nextSibling);
-      toggleBtn.classList.add('in-rail');
-    } else {
-      // Just append to the end of the side rail
-      sideRail.appendChild(toggleBtn);
-      toggleBtn.classList.add('in-rail');
+  if (metaAiIcon) {
+    // Navigate up to find the action container wrapper (usually a div with role="button" or styled wrapper)
+    const buttonWrapper = metaAiIcon.closest('div[role="button"]') || 
+                          metaAiIcon.closest('button') || 
+                          metaAiIcon.closest('a') || 
+                          metaAiIcon.parentElement;
+                          
+    if (buttonWrapper && buttonWrapper.parentNode) {
+      buttonWrapper.parentNode.insertBefore(toggleBtn, buttonWrapper.nextSibling);
+      toggleBtn.className = 'in-rail';
+      return;
     }
+  }
+
+  // Fallback to searching the side rail navigation
+  const sideRail = document.querySelector('[role="navigation"]') || 
+                   document.querySelector('header nav') || 
+                   document.querySelector('header');
+                   
+  if (sideRail) {
+    sideRail.appendChild(toggleBtn);
+    toggleBtn.className = 'in-rail';
   } else {
-    // Fallback to body floating button if layout changes
+    // Absolute fallback to body
     document.body.appendChild(toggleBtn);
   }
 }
@@ -337,9 +347,12 @@ async function fetchGroups() {
 }
 
 // Fetch groups when dropdown is clicked/focused (stops background polling spam)
-document.getElementById('wat-group-select').addEventListener('focus', () => {
-  fetchGroups();
-});
+const groupSelectEl = document.getElementById('wat-group-select');
+if (groupSelectEl) {
+  groupSelectEl.addEventListener('focus', () => {
+    fetchGroups();
+  });
+}
 
 // 4. Backend Connection & QR Polling
 async function checkBackendStatus() {
