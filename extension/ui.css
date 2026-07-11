@@ -51,14 +51,13 @@
   box-shadow: none !important;
 }
 
-/* Sidebar Panel */
 #wat-sidebar {
   position: fixed;
   top: 0;
   right: -380px;
   width: 360px;
   height: 100vh;
-  background: rgba(19, 28, 33, 0.95);
+  background: rgba(19, 28, 33, 0.98);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
@@ -67,9 +66,17 @@
   transition: right 0.4s cubic-bezier(0.075, 0.82, 0.165, 1);
   font-family: 'Outfit', sans-serif;
   color: #e9edef;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box;
+}
+
+#wat-enhance-view, #wat-bot-view {
+  flex: 1 !important;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 #wat-sidebar.open {
