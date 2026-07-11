@@ -10,8 +10,10 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
   generateWAMessageFromContent,
+  makeCacheableSignalKeyStore,
   proto 
 } = require('@whiskeysockets/baileys');
+const NodeCache = require('@cacheable/node-cache');
 
 const app = express();
 const PORT = 3000;
@@ -78,13 +80,20 @@ async function connectToWhatsApp() {
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Menggunakan versi WhatsApp Web: ${version.join('.')}, Terkini: ${isLatest}`);
 
+  const msgRetryCounterCache = new NodeCache();
+
   sock = makeWASocket({
     version,
-    auth: state,
-    printQRInTerminal: false, // We will print it manually using qrcode-terminal
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+    },
+    printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
     syncFullHistory: false,
-    shouldSyncHistoryMessage: () => false
+    shouldSyncHistoryMessage: () => false,
+    msgRetryCounterCache,
+    markOnlineOnConnect: false
   });
 
   sock.ev.on('connection.update', (update) => {
@@ -352,48 +361,35 @@ app.post('/api/send-carousel', async (req, res) => {
       const thumbBuffer = isBase64 ? getThumbnailBuffer(card.thumbnail) : undefined;
       const thumbUrl = !isBase64 && card.thumbnail ? card.thumbnail : undefined;
 
-      const cardText = `*${card.title}*\n${card.description}`;
-      const payload = {
-        text: card.url ? `${cardText}\n\n${card.url}` : cardText
+      const cardText = `*${card.title}*\n${card.description || ''}`;
+      const cardBody = card.url ? `${cardText}\n\n${card.url}` : cardText;
+
+      const adReply = {
+        title: card.title,
+        body: card.description || '',
+        mediaType: 1,
+        sourceUrl: card.url || 'https://wa.me',
+        renderLargerThumbnail: true,
+        showAdAttribution: false
       };
 
-      // Add custom externalAdReply card structure
-      payload.contextInfo = {
-        externalAdReply: {
-          title: card.title,
-          body: card.description,
-          mediaType: 1,
-          thumbnailUrl: thumbUrl || undefined,
-          thumbnail: thumbBuffer || undefined,
-          sourceUrl: card.url || '',
-          renderLargerThumbnail: true
-        }
-      };
-
-      // Add buttons if card has buttons
-      if (card.buttons && card.buttons.length > 0) {
-        const isTemplate = card.buttons.some(b => b.type === 'url' || b.type === 'phone');
-        if (isTemplate) {
-          payload.templateButtons = card.buttons.map((btn, index) => {
-            if (btn.type === 'url') {
-              return { index: index + 1, urlButton: { displayText: btn.text, url: btn.value } };
-            } else {
-              return { index: index + 1, callButton: { displayText: btn.text, phoneNumber: btn.value } };
-            }
-          });
-        } else {
-          payload.buttons = card.buttons.map((btn, index) => ({
-            buttonId: `card_${i}_btn_${index}`,
-            buttonText: { displayText: btn.text },
-            type: 1
-          }));
-          payload.headerType = 1;
-        }
+      if (thumbUrl) {
+        adReply.thumbnailUrl = thumbUrl;
+      } else if (thumbBuffer) {
+        adReply.thumbnail = thumbBuffer;
+      } else {
+        adReply.thumbnail = placeholderBuffer;
       }
 
-      await sock.sendMessage(jid, payload);
-      // Wait 1 second between card deliveries to preserve order
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      await sock.sendMessage(jid, {
+        text: cardBody,
+        contextInfo: { externalAdReply: adReply }
+      });
+
+      // Wait between card deliveries to preserve order
+      if (i < cards.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1200));
+      }
     }
 
     res.json({ success: true, message: 'Carousel message berhasil dikirim!' });
@@ -477,26 +473,66 @@ app.post('/api/send-list', async (req, res) => {
 
     console.log(`[Backend] Mengirim list menu ke ${jid}`);
 
-    const rows = options.map((opt, idx) => ({
+    // Build native flow single_select payload (Baileys v7 interactiveMessage approach)
+    const singleSelectRows = options.map((opt, idx) => ({
+      id: `list_opt_${idx}`,
       title: opt.title,
-      rowId: `list_opt_${idx}`,
-      description: opt.description || undefined
+      description: opt.description || ''
     }));
 
-    const listMessage = {
-      title: title || undefined,
-      text: text,
-      footer: footer || undefined,
-      buttonText: buttonText,
+    const listPayload = JSON.stringify({
+      title: title || 'Pilihan Menu',
       sections: [
         {
           title: 'Pilihan Menu',
-          rows: rows
+          highlight_label: '',
+          rows: singleSelectRows
         }
       ]
-    };
+    });
 
-    await sock.sendMessage(jid, listMessage);
+    const interactiveMsg = proto.Message.InteractiveMessage.create({
+      body: proto.Message.InteractiveMessage.Body.create({ text: text }),
+      footer: footer ? proto.Message.InteractiveMessage.Footer.create({ text: footer }) : undefined,
+      header: title ? proto.Message.InteractiveMessage.Header.create({ title: title, hasMediaAttachment: false }) : undefined,
+      nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+        buttons: [
+          {
+            name: 'single_select',
+            buttonParamsJson: listPayload
+          }
+        ]
+      })
+    });
+
+    const message = generateWAMessageFromContent(jid, {
+      viewOnceMessage: {
+        message: {
+          messageContextInfo: {
+            deviceListMetadata: {},
+            deviceListMetadataVersion: 2
+          },
+          interactiveMessage: interactiveMsg
+        }
+      }
+    }, {});
+
+    await sock.relayMessage(jid, message.message, {
+      messageId: message.key.id,
+      additionalNodes: [
+        {
+          tag: 'biz',
+          attrs: {},
+          content: [
+            {
+              tag: 'interactive',
+              attrs: { type: 'native_flow', v: '1' },
+              content: [{ tag: 'native_flow', attrs: { name: 'single_select' } }]
+            }
+          ]
+        }
+      ]
+    });
 
     res.json({ success: true, message: 'List menu berhasil dikirim!' });
   } catch (err) {
