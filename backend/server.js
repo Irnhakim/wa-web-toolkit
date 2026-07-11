@@ -186,7 +186,27 @@ app.post('/api/send-buttons', async (req, res) => {
       }
     }, {});
 
-    await sock.relayMessage(jid, message.message, { messageId: message.key.id });
+    await sock.relayMessage(jid, message.message, { 
+      messageId: message.key.id,
+      additionalNodes: [
+        {
+          tag: 'biz',
+          attrs: {},
+          content: [
+            {
+              tag: 'interactive',
+              attrs: { type: 'native_flow', v: '1' },
+              content: [
+                {
+                  tag: 'native_flow',
+                  attrs: { name: 'quick_reply' }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
 
     res.json({ success: true, message: 'Button message berhasil dikirim!' });
   } catch (err) {

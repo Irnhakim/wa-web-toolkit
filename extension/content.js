@@ -155,7 +155,7 @@ const sidebarHTML = `
         </div>
         
         <div class="wat-form-group">
-          <label>Tambah Tombol (Maksimal 3)</label>
+          <label>Tambah Tombol (Maksimal 10)</label>
           <div class="wat-button-list" id="wat-btn-list-container">
             <!-- Dynamically added button list -->
           </div>
@@ -733,8 +733,8 @@ function renderListOptionsList() {
 
 // Add Item Triggers
 document.getElementById('wat-add-btn-trigger').addEventListener('click', () => {
-  if (messageButtons.length >= 3) {
-    showStatus('error', 'Maksimal hanya bisa menambahkan 3 tombol.');
+  if (messageButtons.length >= 10) {
+    showStatus('error', 'Maksimal hanya bisa menambahkan 10 tombol.');
     return;
   }
 
