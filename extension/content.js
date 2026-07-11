@@ -388,15 +388,31 @@ function updateActiveChatInfo() {
 
   // Fallback DOM scraper if window.Store is not yet initialized or ready
   let scrapedName = null;
+  let scrapedJid = null;
   const header = document.querySelector('#main header');
   if (header) {
-    const nameEl = header.querySelector('span[dir="auto"]');
-    if (nameEl) {
-      scrapedName = nameEl.innerText.trim();
+    const titleEl = header.querySelector('span[title]') || header.querySelector('[data-testid="conversation-info-header-chat-title"]') || header.querySelector('span[dir="auto"]');
+    if (titleEl) {
+      scrapedName = titleEl.getAttribute('title') || titleEl.innerText.trim();
+    }
+    
+    // Scrape phone number / JID from avatar image if available
+    const imgEl = header.querySelector('img');
+    if (imgEl && imgEl.src) {
+      const src = imgEl.src;
+      const match = src.match(/_(\d{9,20})_/) || src.match(/\/(\d{9,20})_/);
+      if (match) {
+        const id = match[1];
+        if (id.startsWith('120363') || id.length > 15) {
+          scrapedJid = `${id}@g.us`;
+        } else {
+          scrapedJid = `${id}@s.whatsapp.net`;
+        }
+      }
     }
   }
 
-  if (!activeChatJidOrName && !scrapedName) {
+  if (!activeChatJidOrName && !scrapedName && !scrapedJid) {
     activeChatIndicator.innerText = 'Buka salah satu chat terlebih dahulu ⚠️';
     activeChatIndicator.style.color = '#ff9800';
     activeChatIndicator.style.borderColor = 'rgba(255, 152, 0, 0.2)';
@@ -404,13 +420,16 @@ function updateActiveChatInfo() {
     return;
   }
   
-  const targetName = activeChatJidOrName ? activeChatDisplayName : scrapedName;
-  const targetId = activeChatJidOrName || scrapedName;
-  
-  if (!activeChatJidOrName && scrapedName) {
+  if (scrapedJid) {
+    activeChatJidOrName = scrapedJid;
+    activeChatDisplayName = scrapedName || 'Chat';
+  } else if (!activeChatJidOrName && scrapedName) {
     activeChatJidOrName = scrapedName;
     activeChatDisplayName = scrapedName;
   }
+  
+  const targetName = activeChatDisplayName;
+  const targetId = activeChatJidOrName;
   
   let displayJid = targetId.includes('@') ? targetId.split('@')[0] : 'Nama';
   activeChatIndicator.innerText = `Aktif: ${targetName} (${displayJid})`;

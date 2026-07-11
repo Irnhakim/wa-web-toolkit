@@ -7,6 +7,7 @@ const {
   useMultiFileAuthState, 
   DisconnectReason,
   fetchLatestBaileysVersion,
+  generateWAMessageFromContent,
   proto 
 } = require('@whiskeysockets/baileys');
 
@@ -166,7 +167,7 @@ app.post('/api/send-buttons', async (req, res) => {
       }
     });
 
-    const message = {
+    const message = generateWAMessageFromContent(jid, {
       viewOnceMessage: {
         message: {
           messageContextInfo: {
@@ -183,9 +184,9 @@ app.post('/api/send-buttons', async (req, res) => {
           })
         }
       }
-    };
+    }, {});
 
-    await sock.relayMessage(jid, message, {});
+    await sock.relayMessage(jid, message.message, { messageId: message.key.id });
 
     res.json({ success: true, message: 'Button message berhasil dikirim!' });
   } catch (err) {
