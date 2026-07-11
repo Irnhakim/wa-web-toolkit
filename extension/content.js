@@ -148,7 +148,8 @@ const sidebarHTML = `
           Buka WhatsApp -> Perangkat Tertaut -> Tautkan Perangkat
         </div>
       </div>
-  </div>
+    </div> <!-- END CONNECTION VIEW -->
+  </div> <!-- END BOT VIEW -->
 `;
 
 // Create elements
@@ -217,8 +218,8 @@ const navEnhanceBtn = document.getElementById('nav-enhance-btn');
 const navBotBtn = document.getElementById('nav-bot-btn');
 
 function switchToEnhance() {
-  enhanceView.style.display = 'block';
-  botView.style.display = 'none';
+  if (enhanceView) enhanceView.style.setProperty('display', 'block', 'important');
+  if (botView) botView.style.setProperty('display', 'none', 'important');
   navEnhanceBtn.style.color = '#00b4db';
   navEnhanceBtn.style.background = 'rgba(0,180,219,0.1)';
   navEnhanceBtn.style.borderBottom = '2px solid #00b4db';
@@ -228,8 +229,8 @@ function switchToEnhance() {
 }
 
 function switchToBot() {
-  enhanceView.style.display = 'none';
-  botView.style.display = 'flex';
+  if (enhanceView) enhanceView.style.setProperty('display', 'none', 'important');
+  if (botView) botView.style.setProperty('display', 'flex', 'important');
   navBotBtn.style.color = '#00b4db';
   navBotBtn.style.background = 'rgba(0,180,219,0.1)';
   navBotBtn.style.borderBottom = '2px solid #00b4db';

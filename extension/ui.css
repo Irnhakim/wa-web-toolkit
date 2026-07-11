@@ -33,21 +33,25 @@
   right: auto !important;
   width: 40px !important;
   height: 40px !important;
-  margin: 8px auto !important;
+  margin: 0 auto !important;
+  margin-top: -6px !important;
+  margin-bottom: 6px !important;
   border-radius: 50% !important;
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(0, 180, 219, 0.1) !important;
+  border: 1px solid rgba(0, 180, 219, 0.2) !important;
   box-shadow: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   font-size: 20px !important;
   z-index: 10 !important;
-  transition: background 0.2s, transform 0.2s !important;
+  transition: all 0.2s ease !important;
 }
 
 #wat-toggle-btn.in-rail:hover {
-  background: rgba(0, 180, 219, 0.2) !important;
-  transform: scale(1.05) !important;
+  background: rgba(0, 180, 219, 0.3) !important;
+  border-color: rgba(0, 180, 219, 0.5) !important;
+  transform: scale(1.08) !important;
   box-shadow: none !important;
 }
 
