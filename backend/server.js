@@ -117,9 +117,11 @@ function getThumbnailBuffer(thumbStr) {
     return undefined; // If it's a URL, externalAdReply handles thumbnailUrl
   } catch (err) {
     console.error('Gagal memproses buffer thumbnail:', err);
-    return undefined;
   }
 }
+// Small 1x1 transparent PNG base64 placeholder (to satisfy WhatsApp thumbnail validation locally without network redirects)
+const PLACEHOLDER_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+const placeholderBuffer = Buffer.from(PLACEHOLDER_PNG_BASE64, 'base64');
 
 // API Endpoints
 app.get('/api/status', (req, res) => {
@@ -186,6 +188,15 @@ app.post('/api/send-buttons', async (req, res) => {
       }
     }, {});
 
+    const nativeFlows = [];
+    const hasUrl = buttons.some(b => b.type === 'url');
+    const hasPhone = buttons.some(b => b.type === 'phone');
+    const hasReply = buttons.some(b => b.type === 'quick_reply' || !b.type);
+
+    if (hasUrl) nativeFlows.push({ tag: 'native_flow', attrs: { name: 'cta_url' } });
+    if (hasPhone) nativeFlows.push({ tag: 'native_flow', attrs: { name: 'cta_call' } });
+    if (hasReply || nativeFlows.length === 0) nativeFlows.push({ tag: 'native_flow', attrs: { name: 'quick_reply' } });
+
     await sock.relayMessage(jid, message.message, { 
       messageId: message.key.id,
       additionalNodes: [
@@ -196,12 +207,7 @@ app.post('/api/send-buttons', async (req, res) => {
             {
               tag: 'interactive',
               attrs: { type: 'native_flow', v: '1' },
-              content: [
-                {
-                  tag: 'native_flow',
-                  attrs: { name: 'quick_reply' }
-                }
-              ]
+              content: nativeFlows
             }
           ]
         }
@@ -231,20 +237,31 @@ app.post('/api/send-preview', async (req, res) => {
     const thumbBuffer = isBase64 ? getThumbnailBuffer(thumbnail) : undefined;
     const thumbUrl = !isBase64 && thumbnail ? thumbnail : undefined;
 
+    let formattedUrl = url ? url.trim() : '';
+    if (formattedUrl && !/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = 'https://' + formattedUrl;
+    }
+
     const adReply = {
-      title: title || undefined,
-      body: description || undefined,
-      mediaType: (thumbUrl || thumbBuffer) ? 1 : 0,
-      sourceUrl: url,
-      renderLargerThumbnail: !!(thumbUrl || thumbBuffer),
+      title: title || 'Tautan',
+      body: description || formattedUrl,
+      mediaType: 1, // 1 = Image
+      sourceUrl: formattedUrl,
+      renderLargerThumbnail: true,
       showAdAttribution: false
     };
 
-    if (thumbUrl) adReply.thumbnailUrl = thumbUrl;
-    if (thumbBuffer) adReply.thumbnail = thumbBuffer;
+    if (thumbUrl) {
+      adReply.thumbnailUrl = thumbUrl;
+    } else if (thumbBuffer) {
+      adReply.thumbnail = thumbBuffer;
+    } else {
+      // Fallback local transparent image buffer (100% reliable, no internet required, no redirects)
+      adReply.thumbnail = placeholderBuffer;
+    }
 
     await sock.sendMessage(jid, {
-      text: `${text}\n\n${url}`,
+      text: `${text}\n\n${formattedUrl}`,
       contextInfo: {
         externalAdReply: adReply
       }

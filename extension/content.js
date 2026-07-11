@@ -114,16 +114,8 @@ const sidebarHTML = `
 
         <!-- CONTACT PICKER FIELDS -->
         <div id="wat-contact-picker-container">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <label style="margin-bottom: 0; font-size: 11px; color: #8696a0;">Nomor/JID Tujuan</label>
-            <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #00b4db; cursor: pointer; margin-bottom: 0; font-weight: 500;">
-              <input type="checkbox" id="wat-use-active-chat" checked style="cursor: pointer; accent-color: #00b4db;"> Chat Aktif WA Web
-            </label>
-          </div>
-          <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789" style="display: none;">
-          <div id="wat-active-chat-indicator" style="font-size: 13px; font-weight: 600; padding: 8px 10px; background: rgba(0, 180, 219, 0.08); border: 1px solid rgba(0, 180, 219, 0.15); border-radius: 6px; color: #00b4db; text-align: center;">
-            Mendeteksi chat aktif... 🔍
-          </div>
+          <label style="margin-bottom: 5px; font-size: 11px; color: #8696a0; display: block;">Nomor HP Tujuan</label>
+          <input type="text" id="wat-recipient-jid" class="wat-input" placeholder="Contoh: 628123456789">
         </div>
 
         <!-- GROUP PICKER FIELDS -->
@@ -134,7 +126,7 @@ const sidebarHTML = `
           </select>
         </div>
         
-        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Mengirim otomatis ke kontak yang sedang Anda buka di WhatsApp Web.</div>
+        <div style="font-size: 11px; color: #8696a0; margin-top: 4px;" id="wat-recipient-tip">Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).</div>
       </div>
 
       <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 15px 0;" />
@@ -460,23 +452,6 @@ function updateActiveChatInfo() {
   activeChatIndicator.style.background = 'rgba(0, 230, 118, 0.05)';
 }
 
-// Active chat toggle listener
-document.getElementById('wat-use-active-chat').addEventListener('change', (e) => {
-  const input = document.getElementById('wat-recipient-jid');
-  const indicator = document.getElementById('wat-active-chat-indicator');
-  const tip = document.getElementById('wat-recipient-tip');
-  
-  if (e.target.checked) {
-    input.style.display = 'none';
-    indicator.style.display = 'block';
-    tip.innerText = 'Mengirim otomatis ke kontak yang sedang Anda buka di WhatsApp Web.';
-    updateActiveChatInfo();
-  } else {
-    input.style.display = 'block';
-    indicator.style.display = 'none';
-    tip.innerText = 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
-  }
-});
 
 // Target Type Selector (Contact vs Group)
 document.querySelectorAll('input[name="wat-target-type"]').forEach(radio => {
@@ -493,10 +468,7 @@ document.querySelectorAll('input[name="wat-target-type"]').forEach(radio => {
     } else {
       contactPicker.style.display = 'block';
       groupPicker.style.display = 'none';
-      const useActiveChat = document.getElementById('wat-use-active-chat').checked;
-      tip.innerText = useActiveChat 
-        ? 'Mengirim otomatis ke kontak yang sedang Anda buka di WhatsApp Web.'
-        : 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
+      tip.innerText = 'Gunakan kode negara tanpa tanda + (contoh: 628... untuk Indonesia).';
     }
   });
 });
@@ -614,18 +586,10 @@ function getRecipient() {
     return val;
   }
 
-  // Contact flow
-  const useActiveChat = document.getElementById('wat-use-active-chat').checked;
-  if (useActiveChat) {
-    if (!activeChatJidOrName) {
-      throw new Error('Tidak ada chat aktif terdeteksi. Silakan buka salah satu chat terlebih dahulu atau pilih input manual.');
-    }
-    return activeChatJidOrName;
-  }
-
+  // Contact flow - just use phone number input
   let jid = document.getElementById('wat-recipient-jid').value.trim();
   if (!jid) {
-    throw new Error('Silakan masukkan nomor tujuan.');
+    throw new Error('Silakan masukkan nomor HP tujuan.');
   }
   jid = jid.replace(/[^0-9]/g, '');
   if (jid.startsWith('0')) {
