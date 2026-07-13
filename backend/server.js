@@ -39,7 +39,9 @@ function clearAuthDir() {
   }
 }
 
-// Optimization: Periodically clean up old prekeys and unsynced state files to prevent disk bloat
+// Cleanup: only remove OLD pre-key files that have already been consumed.
+// NEVER delete session, sender-key, or app-state files — they hold Signal Protocol
+// session state needed to encrypt/decrypt messages (deleting them causes Bad MAC errors).
 function runPeriodicCleanup() {
   const authDir = path.join(__dirname, 'auth_info');
   if (!fs.existsSync(authDir)) return;
@@ -48,23 +50,32 @@ function runPeriodicCleanup() {
     const files = fs.readdirSync(authDir);
     let count = 0;
     const now = Date.now();
-    // Prekeys, sessions, and other dynamic data older than 6 hours can be purged
-    const maxAgeMs = 6 * 60 * 60 * 1000; 
+    // Only purge pre-keys older than 7 days — these are one-time-use keys
+    // that WhatsApp already consumed during handshake.
+    const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+
+    // Patterns that are SAFE to purge after expiry:
+    const SAFE_TO_PURGE = /^pre-key-\d+\.json$/;
+
+    // Patterns that must NEVER be deleted (session state, sender keys, app state)
+    const NEVER_DELETE = /^(creds|session-|sender-key-|app-state-|md-app-state-).*\.json$/;
 
     files.forEach(file => {
-      // Keep essential credentials!
-      if (file === 'creds.json') return;
+      if (NEVER_DELETE.test(file)) return;   // always keep
+      if (!SAFE_TO_PURGE.test(file)) return; // unknown file — keep to be safe
 
       const filePath = path.join(authDir, file);
-      const stat = fs.statSync(filePath);
-      
-      if (now - stat.mtimeMs > maxAgeMs) {
-        fs.unlinkSync(filePath);
-        count++;
-      }
+      try {
+        const stat = fs.statSync(filePath);
+        if (now - stat.mtimeMs > maxAgeMs) {
+          fs.unlinkSync(filePath);
+          count++;
+        }
+      } catch (_) { /* file already gone — ignore */ }
     });
+
     if (count > 0) {
-      console.log(`[Cleanup] Berhasil membersihkan ${count} file auth_info usang.`);
+      console.log(`[Cleanup] Membersihkan ${count} pre-key usang (>7 hari).`);
     }
   } catch (e) {
     console.error('Cleanup auth_info error:', e.message);
@@ -127,8 +138,6 @@ async function connectToWhatsApp() {
       console.log('WhatsApp Bot berhasil terhubung! ✅');
       isConnected = true;
       latestQR = null;
-      // Run a quick cleanup immediately on connection success
-      runPeriodicCleanup();
     }
   });
 
@@ -239,22 +248,18 @@ app.post('/api/send-buttons', async (req, res) => {
     });
 
     const message = generateWAMessageFromContent(jid, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: proto.Message.InteractiveMessage.create({
-            body: proto.Message.InteractiveMessage.Body.create({ text: text }),
-            footer: footer ? proto.Message.InteractiveMessage.Footer.create({ text: footer }) : undefined,
-            header: title ? proto.Message.InteractiveMessage.Header.create({ title: title, hasMediaAttachment: false }) : undefined,
-            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-              buttons: formattedButtons
-            })
-          })
-        }
-      }
+      messageContextInfo: {
+        deviceListMetadata: {},
+        deviceListMetadataVersion: 2
+      },
+      interactiveMessage: proto.Message.InteractiveMessage.create({
+        body: proto.Message.InteractiveMessage.Body.create({ text: text }),
+        footer: footer ? proto.Message.InteractiveMessage.Footer.create({ text: footer }) : undefined,
+        header: title ? proto.Message.InteractiveMessage.Header.create({ title: title, hasMediaAttachment: false }) : undefined,
+        nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+          buttons: formattedButtons
+        })
+      })
     }, {});
 
     const nativeFlows = [];
@@ -506,15 +511,11 @@ app.post('/api/send-list', async (req, res) => {
     });
 
     const message = generateWAMessageFromContent(jid, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: interactiveMsg
-        }
-      }
+      messageContextInfo: {
+        deviceListMetadata: {},
+        deviceListMetadataVersion: 2
+      },
+      interactiveMessage: interactiveMsg
     }, {});
 
     await sock.relayMessage(jid, message.message, {
